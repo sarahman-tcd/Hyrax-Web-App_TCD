@@ -51,7 +51,22 @@
 
   end
   %>
-  <hr class="dotted">
+
+  <% if request.original_url =~ /\/(works|folios|subseries)\/(\w+)/ %>
+    <% file_set_id = $2%>
+
+    <hr class="dotted" id="downloadButtonHR">
+    
+    <a id="downloadButton" href="<%= main_app.pdf_path(file_set_id: file_set_id) %>" target="_blank">
+        <br />
+        Download PDF
+        <br />
+        <span class="fa fa-file-pdf-o fa-3x" style="color:#6d6d6d"></span>
+        <br />  
+    </a>
+  <% end %>  
+    <hr class="dotted">
+  
     <a href="/export/dublinCore.xml?id=<%= indivId %> " target="_blank">
         <br />
         <%= t('hyrax.download.metadata') %>
@@ -98,3 +113,49 @@
     <% end %>
 
 </div>
+
+
+
+
+<script>
+  var userSignedIn = <%= user_signed_in? ? 'true' : 'false' %>;
+</script>
+
+<script>
+$(document).ready(function() {
+  const fileSetIdMatch = window.location.href.match(/\/(works|folios|subseries)\/(\w+)/);
+  if (fileSetIdMatch) {
+    const fileSetId = fileSetIdMatch[2];
+    console.log (fileSetId);
+    $.ajax({
+      url: `/pdf_generation/check_pdf_file_exists/${fileSetId}`,
+      type: 'GET',
+      dataType: 'json',
+      success: function(data) {
+        console.log(userIsSignedIn);
+        console.log(data.pdf_file_exists);
+        if (data.pdf_file_exists || userIsSignedIn()) {
+          $('#downloadButton').show();          
+          $('#downloadButtonHR').show();
+        } else {
+          $('#downloadButton').hide();
+          $('#downloadButtonHR').hide();
+        }
+      },
+      error: function(xhr, status, error) {
+        console.error('Error checking PDF file existence:', error);
+      }
+    });
+  }
+});
+
+function userIsSignedIn() {
+  return userSignedIn === true;
+}
+
+</script>
+
+
+
+
+

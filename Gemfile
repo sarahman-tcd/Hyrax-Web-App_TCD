@@ -135,3 +135,9 @@ gem 'hydra-role-management'
 gem 'willow_sword', github: 'notch8/willow_sword'
 
 gem 'kaminari'
+
+gem 'combine_pdf'
+
+gem 'prawn'
+
+gem 'mini_magick'

@@ -1,5 +1,10 @@
 Rails.application.routes.draw do
 
+  get '/pdf/:file_set_id', to: 'pdf_generation#pdf', as: 'pdf'
+
+  get 'pdf_generation/check_pdf_file_exists/:file_set_id', to: 'pdf_generation#check_pdf_file_exists'
+
+
   #get 'image_display_names/new'
   resources :image_display_names, :only => [ :new, :create ]
 
@@ -82,5 +87,5 @@ Rails.application.routes.draw do
   end
 
   mount BrowseEverything::Engine => '/browse'
-  # For details on the DSL available within this file, see http://guides.rubyonrails.org/routing.html
+  # For details on the DSL available within this file, see http://guides.rubyonrails.org/routing.html 
 end
