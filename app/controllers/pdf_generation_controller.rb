@@ -10,7 +10,7 @@ class PdfGenerationController < ApplicationController
     
     def pdf   
       begin   
-        Rails.logger.debug "version 7.0.4 initiated..."
+        Rails.logger.debug "version 7.0.5 initiated..."
         work_id = params[:file_set_id]         
         
         # Update the pdf file every time - logged in user
@@ -26,7 +26,10 @@ class PdfGenerationController < ApplicationController
           return
         end
 
-        $solr = RSolr.connect(url: 'http://dcdev-solr.tcd.ie:8983/solr/tcd-hyrax/') # Change the url for LIVE
+        # Change the url for LIVE
+        dev = 'http://dcdev-solr.tcd.ie:8983/solr/tcd-hyrax/'
+        primary01 = 'http://digcoll-solr01.tcd.ie:8983/solr/tcd-hyrax/'
+        $solr = RSolr.connect(url: dev) 
         work_response = $solr.get('select', params: { q: "id:#{work_id}" })
         work_data = work_response['response']['docs'][0]        
     
@@ -126,7 +129,7 @@ class PdfGenerationController < ApplicationController
         pdf = Prawn::Document.new
     
         # Add a title page
-        add_title_page(pdf, title, shelf_mark, doi, creator, contributor, date_created, '/opt/app/TCD-Hyrax-Web-App/releases/20220519122003/tcd-logo-2x.png')
+        add_title_page(pdf, title, shelf_mark, doi, creator, contributor, date_created, '/opt/app/TCD-Hyrax-Web-App/tcd-logo-2x.png') 
         pdf.start_new_page
         
         # Initialize a flag to check if any images have been added
