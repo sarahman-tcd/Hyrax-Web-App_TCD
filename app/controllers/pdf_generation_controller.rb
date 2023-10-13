@@ -5,21 +5,7 @@ require 'combine_pdf'
 require 'prawn'
 require 'mini_magick'
 
-class PdfGenerationController < ApplicationController
-    def generate_pdf_old   
-      begin   
-      file_set_id = params[:file_set_id] 
-      # file_set_id = 'rf55z804f'
-      
-      paths = JobIoWrapper.where(file_set_id: file_set_id).pluck(:path)
-
-      # Call the method to generate and download the PDF
-      generate_and_download_pdf(paths, file_set_id)
-
-      rescue => e
-        Rails.logger.error "Error saving PDF: #{e.message}"
-      end
-    end
+class PdfGenerationController < ApplicationController    
     Encoding.default_external = Encoding::UTF_8
     
     def pdf   
@@ -27,9 +13,10 @@ class PdfGenerationController < ApplicationController
         Rails.logger.debug "version 7.0.4 initiated..."
         work_id = params[:file_set_id]         
         
+        # Update the pdf file every time - logged in user
         delete_file(work_id) if user_signed_in?
 
-        # Check if the PDF file already exists          
+        # Check if the PDF file already exists - for end user        
         existing_pdf_path = "/digicolapp/datastore/pdf/#{work_id}.pdf"
         if File.exist?(existing_pdf_path)
           Rails.logger.debug "PDF already exists. Sending existing PDF."
@@ -39,31 +26,20 @@ class PdfGenerationController < ApplicationController
           return
         end
 
-        $solr = RSolr.connect(url: 'http://dcdev-solr.tcd.ie:8983/solr/tcd-hyrax/')
+        $solr = RSolr.connect(url: 'http://dcdev-solr.tcd.ie:8983/solr/tcd-hyrax/') # Change the url for LIVE
         work_response = $solr.get('select', params: { q: "id:#{work_id}" })
-        work_data = work_response['response']['docs'][0]
-        Rails.logger.debug "Debug message: #{work_data}"
+        work_data = work_response['response']['docs'][0]        
     
         # Extract relevant data from Solr response
         title = work_data['title_tesim'].present? ? work_data['title_tesim'].first : 'No title available'
         shelf_mark = work_data['identifier_tesim'].present? ? work_data['identifier_tesim'].first : 'No shelf mark available'
         doi = work_data['doi_tesim'].present? ? work_data['doi_tesim'].first : 'No DOI available'
-        date_created = work_data['date_created_tesim'].present? ? work_data['date_created_tesim'].first : 'No date created available'
-        # copyright = work_data['copyright_status_tesim'].present? ? work_data['copyright_status_tesim'].first : 'Copyright status not specified'
-        
+        date_created = work_data['date_created_tesim'].present? ? work_data['date_created_tesim'].first : 'No date created available'        
         # Check if creator is present, is an array, and not empty
-        creator = work_data['creator_tesim'].present? && work_data['creator_tesim'].is_a?(Array) && !work_data['creator_tesim'].empty? ? work_data['creator_tesim'] : ['Not specified']
-        
+        creator = work_data['creator_tesim'].present? && work_data['creator_tesim'].is_a?(Array) && !work_data['creator_tesim'].empty? ? work_data['creator_tesim'] : ['Not specified']        
         # Check if contributor is present, is an array, and not empty
         contributor = work_data['contributor_tesim'].present? && work_data['contributor_tesim'].is_a?(Array) && !work_data['contributor_tesim'].empty? ? work_data['contributor_tesim'] : ['Not specified']
-             
-        # # Check if rights_statement is present, is an array, and not empty
-        # rights_statement = work_data['rights_statement_tesim'].present? && work_data['rights_statement_tesim'].is_a?(Array) && !work_data['rights_statement_tesim'].empty? ? work_data['rights_statement_tesim'] : ['Not specified']
-       
-        # # Check if contributor is present, is an array, and not empty
-        # copyright_note = work_data['copyright_note_tesim'].present? && work_data['copyright_note_tesim'].is_a?(Array) && !work_data['copyright_note_tesim'].empty? ? work_data['copyright_note_tesim'] : ['Not specified']
-            
-
+          
         folder_numbers = work_data['folder_number_tesim'].first
         file_set_ids = work_data['file_set_ids_ssim']
         
@@ -80,41 +56,35 @@ class PdfGenerationController < ApplicationController
             file_set_data = response['response']['docs'].first
             image_name = file_set_data['label_ssi']
 
-
-            # model_type= file_set_data['has_model_ssim'].first
+            # If there is child work exist
             if (image_name.nil? || image_name.empty?) 
-              # && (model_type=='Folio' || model_type=='Subseries') 
               nested_file_set_ids = file_set_data['file_set_ids_ssim']
-              if nested_file_set_ids.present?
 
+              if nested_file_set_ids.present?
                 nested_file_set_ids.each do |next_file_set_id|
-                  # Construct a Solr query to fetch the label_ssi for the given file_set_id
-                  query = "id:#{next_file_set_id}"
-                  
-                  # Execute the Solr query
+                  query = "id:#{next_file_set_id}"                  
                   response = $solr.get('select', params: { q: query })
-                  # Extract the image name (label_ssi) from the Solr response
                   next_file_set_data = response['response']['docs'].first
                   imagename = next_file_set_data['label_ssi']
-
-                  # Add the image name to the list if it exists
                   image_names << imagename if imagename.present?
                 end
-              end
-            end            
+              end              
+            end    
+
             # Add the image name to the list if it exists
             image_names << image_name if image_name.present?
           end
     
+          # Sort the image names to maintain the image order in the pdf
           image_names.sort!
 
-          if image_names.present?
-           
-            # Construct paths based on folder_numbers and image name
-            
+          if image_names.present?           
+            # Construct paths based on folder_numbers and image name            
             folder_path_lo = "/digicolapp/datastore/web/#{folder_numbers}/LO"
             folder_path_hi = "/digicolapp/datastore/web/#{folder_numbers}/HI"
             
+            # Redirect to the HI or LO directory based on the image name suffix 
+            # If not, redirect based on the existing directory 
             first_image = image_names[0]
             folder_type = if first_image.include?("_HI")
                             'HI'
@@ -128,8 +98,7 @@ class PdfGenerationController < ApplicationController
                             end
                           end
             
-            paths = image_names.map { |image_name| "/digicolapp/datastore/web/#{folder_numbers}/#{folder_type}/#{image_name}" }
-            
+            paths = image_names.map { |image_name| "/digicolapp/datastore/web/#{folder_numbers}/#{folder_type}/#{image_name}" }            
 
             response.headers['Content-Type'] = 'application/pdf'
             response.headers['Content-Disposition'] = "attachment; filename=\"#{work_id}.pdf\""           
@@ -147,11 +116,9 @@ class PdfGenerationController < ApplicationController
       
       rescue => e
         backtrace = e.backtrace.first
-        Rails.logger.error "MK2-Error: #{e.message}, Raised at: #{backtrace}"
+        Rails.logger.error "Error: #{e.message}, Raised at: #{backtrace}"
       end
-    end
-    
-
+    end   
     
     def generate_and_download_pdf(paths, file_set_id, title, shelf_mark, doi, creator, contributor, date_created)
       begin
@@ -161,6 +128,7 @@ class PdfGenerationController < ApplicationController
         # Add a title page
         add_title_page(pdf, title, shelf_mark, doi, creator, contributor, date_created, '/opt/app/TCD-Hyrax-Web-App/releases/20220519122003/tcd-logo-2x.png')
         pdf.start_new_page
+        
         # Initialize a flag to check if any images have been added
         images_added = false
     
@@ -185,8 +153,6 @@ class PdfGenerationController < ApplicationController
 
     
           # Add the compressed image to the PDF
-          # pdf.image StringIO.new(resized_image_data), at: [0, pdf.bounds.height], width: pdf.bounds.width, height: pdf.bounds.height
-
           if image_width > image_height && image_width > pdf.bounds.width
             # Landscape image
             pdf.image StringIO.new(resized_image_data), width: pdf.bounds.width, position: :left
@@ -208,10 +174,11 @@ class PdfGenerationController < ApplicationController
         send_file pdf_path, filename: pdf_filename, type: 'application/pdf', disposition: 'inline'
       rescue => e
         backtrace = e.backtrace.first
-        Rails.logger.error "MK2-Error: #{e.message}, Raised at: #{backtrace}"
+        Rails.logger.error "Error: #{e.message}, Raised at: #{backtrace}"
       end
-    end
-    
+    end    
+
+    # Based on the file existence Download PDF will be visible
     def check_pdf_file_exists
       file_set_id = params[:file_set_id]
       @pdf_file_exists = File.exist?("/digicolapp/datastore/pdf/#{file_set_id}.pdf")
@@ -220,21 +187,15 @@ class PdfGenerationController < ApplicationController
         format.json { render json: { pdf_file_exists: @pdf_file_exists } }
       end
     end
-
+    
     
   
     private
   
     def add_title_page(pdf, title, shelf_mark, doi, creator, contributor, date_created, logo_path)
-      # # Add your logo at the top and center
 
-      pdf.image logo_path, position: :left, width: 232, height: 62
-      # pdf.move_down pdf.bounds.height - 50 # Adjust as needed
-
-      # Add a horizontal line under the logo
-      # pdf.stroke_horizontal_line pdf.bounds.left, pdf.bounds.right, at: pdf.cursor - 5
-
-      
+      # Add your logo at the top left corner
+      pdf.image logo_path, position: :left, width: 232, height: 62      
       pdf.move_down 22 # Adjust as needed
     
       # Add the title
@@ -242,8 +203,8 @@ class PdfGenerationController < ApplicationController
       pdf.text title, style: :bold, encoding: 'UTF-8'
       pdf.move_down 10
     
-      pdf.font_size 12
 
+      pdf.font_size 12
       # Add Shelf Mark/Reference Number
       pdf.text "Shelf Mark/Reference Number", style: :bold, encoding: 'UTF-8'
       pdf.text "#{shelf_mark}", encoding: 'UTF-8'
@@ -269,21 +230,6 @@ class PdfGenerationController < ApplicationController
       pdf.text "#{date_created}", encoding: 'UTF-8'
       pdf.move_down 10          
 
-      # # Add Rights statement(s)
-      # pdf.text "Rights statement", style: :bold, encoding: 'UTF-8'
-      # rights_statement.each { |c| pdf.text "#{c}", encoding: 'UTF-8' }
-      # pdf.move_down 10
-    
-      # # Add Copyright note(s)
-      # pdf.text "Copyright note", style: :bold, encoding: 'UTF-8'
-      # copyright_note.each { |c| pdf.text "#{c}", encoding: 'UTF-8' }
-      # pdf.move_down 10
-
-      # # Add Copyright status
-      # pdf.text "Copyright status", style: :bold, encoding: 'UTF-8'
-      # pdf.text "#{copyright}", encoding: 'UTF-8'
-     
-
       # Add the fixed text at the bottom center
       fixed_text = "Library of Trinity College Dublin, Digital Collections (https://digitalcollections.tcd.ie/)."
       pdf.fill_color "888888" # Gray color
@@ -295,9 +241,6 @@ class PdfGenerationController < ApplicationController
                   align: :center,
                   encoding: 'UTF-8')
     end
-    
-  
-
 
     def resize_image(image_data)
       image = MiniMagick::Image.read(image_data)
@@ -323,8 +266,7 @@ class PdfGenerationController < ApplicationController
     
       # Return the image as binary data
       image.to_blob
-    end
-    
+    end    
 
     def delete_file (file_set_id)
       existing_pdf_path = "/digicolapp/datastore/pdf/#{file_set_id}.pdf"
@@ -336,49 +278,3 @@ class PdfGenerationController < ApplicationController
       end
     end
   end
-    
-
-
-
-  
-    # def generate_and_download_pdf(paths, file_set_id)
-    #   begin
-    #     pdf = Prawn::Document.new
-    #     page_width = pdf.bounds.width
-    #     page_height = pdf.bounds.height
-      
-    #     # Initialize a flag to check if any images have been added
-    #     images_added = false
-      
-    #     paths.each do |url|
-    #       # Get the image data
-    #       image_data = URI.open(url).read
-      
-    #       # If images haven't been added yet, don't start a new page
-    #       if images_added
-    #         pdf.start_new_page
-    #       else
-    #         images_added = true
-    #       end
-      
-    #       # Add the image at the top-left corner, adjusting the width and height to fit the page
-    #       pdf.image StringIO.new(image_data), at: [0, page_height], width: page_width, height: page_height
-    #     end
-      
-    #     # Generate a unique filename for the PDF
-    #     pdf_filename = "#{file_set_id}.pdf"
-      
-    #     pdf.render_stream do |chunk|
-    #       response.stream.write(chunk)
-    #     end      
-       
-    #   rescue => e
-    #     Rails.logger.error "Error-SK: #{e.message}"
-    #   ensure
-    #     response.stream.close
-    #   end
-    # end
-    
-  
-
-
