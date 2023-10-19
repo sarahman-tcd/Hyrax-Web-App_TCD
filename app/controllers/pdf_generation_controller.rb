@@ -4,15 +4,19 @@ require 'open-uri'
 require 'combine_pdf'
 require 'prawn'
 require 'mini_magick'
+require 'rtesseract'
+require 'tempfile' 
+
 
 class PdfGenerationController < ApplicationController    
     Encoding.default_external = Encoding::UTF_8
     
     def pdf   
       begin   
-        Rails.logger.debug "version 7.0.5 initiated..."
-        work_id = params[:file_set_id]         
-        
+        Rails.logger.debug "version 8.0.4 initiated..."
+        work_id = params[:file_set_id]        
+        ocr_checkbox_val = params[:ocr_checkbox]      
+
         # Update the pdf file every time - logged in user
         delete_file(work_id) if user_signed_in?
 
@@ -107,7 +111,7 @@ class PdfGenerationController < ApplicationController
             response.headers['Content-Disposition'] = "attachment; filename=\"#{work_id}.pdf\""           
 
             # Call the method to generate and download the PDF
-            generate_and_download_pdf(paths, work_id, title, shelf_mark, doi, creator, contributor, date_created)
+            generate_and_download_pdf(paths, work_id, title, shelf_mark, doi, creator, contributor, date_created, ocr_checkbox_val)
           else
             # Handle the case where image names could not be retrieved
             Rails.logger.error "Error: Image names could not be retrieved from Solr"
@@ -123,7 +127,7 @@ class PdfGenerationController < ApplicationController
       end
     end   
     
-    def generate_and_download_pdf(paths, file_set_id, title, shelf_mark, doi, creator, contributor, date_created)
+    def generate_and_download_pdf(paths, file_set_id, title, shelf_mark, doi, creator, contributor, date_created, ocr_checkbox_val)
       begin
         # Create a new PDF document
         pdf = Prawn::Document.new
@@ -138,8 +142,18 @@ class PdfGenerationController < ApplicationController
         paths.each do |url|
           # Get the image data
           image_data = URI.open(url).read
-    
-         # Resize and compress the image
+
+
+          if ocr_checkbox_val.to_s == "true"
+            Rails.logger.debug "ocr_checkbox_val: #{ocr_checkbox_val}"
+            # Perform OCR on the image and get the extracted text
+            extracted_text = perform_ocr(image_data)
+            Rails.logger.debug "Debug message: #{extracted_text}"
+            # Embed the extracted OCR text into the PDF
+            pdf.text(extracted_text) if extracted_text.present?
+          end
+
+          # Resize and compress the image
           resized_image_data = resize_image(image_data)
 
           # If images haven't been added yet, don't start a new page
@@ -154,7 +168,6 @@ class PdfGenerationController < ApplicationController
           image_width= image.width
           image_height = image.height
 
-    
           # Add the compressed image to the PDF
           if image_width > image_height && image_width > pdf.bounds.width
             # Landscape image
@@ -172,9 +185,18 @@ class PdfGenerationController < ApplicationController
         pdf_filename = "#{file_set_id}.pdf"
         pdf_path = "/digicolapp/datastore/pdf/#{pdf_filename}"           
         pdf.render_file(pdf_path)
-    
-        # Send the existing PDF file to the user
-        send_file pdf_path, filename: pdf_filename, type: 'application/pdf', disposition: 'inline'
+        
+        if ocr_checkbox_val.to_s == "true"
+          pdf_filename = "OCR_enabled_pdf_#{file_set_id}.pdf"
+          # Perform OCR on the entire PDF to make it searchable
+          final_pdf_path = add_ocr_to_pdf(pdf_path, file_set_id)
+          Rails.logger.debug "final_pdf_path: #{final_pdf_path}"
+          # Send the existing PDF file to the user
+          send_file final_pdf_path, filename: pdf_filename, type: 'application/pdf', disposition: 'inline'
+        else
+          # Send the existing PDF file to the user
+          send_file pdf_path, filename: pdf_filename, type: 'application/pdf', disposition: 'inline'
+        end
       rescue => e
         backtrace = e.backtrace.first
         Rails.logger.error "Error: #{e.message}, Raised at: #{backtrace}"
@@ -234,7 +256,7 @@ class PdfGenerationController < ApplicationController
       pdf.move_down 10          
 
       # Add the fixed text at the bottom center
-      fixed_text = "Library of Trinity College Dublin, Digital Collections (https://digitalcollections.tcd.ie/)."
+      fixed_text = "Library of Trinity College Dublin, Digital Collections (https://digitalcollections.tcd.ie/)"
       pdf.fill_color "888888" # Gray color
       pdf.text_box(fixed_text,
                   at: [pdf.bounds.left, pdf.bounds.bottom + 15], # Adjust Y value as needed
@@ -280,4 +302,55 @@ class PdfGenerationController < ApplicationController
         Rails.logger.debug "PDF File not found."
       end
     end
+
+    # OCR enabled PDF
+    def perform_ocr(image_data)
+      base_tempfile_path = "/digicolapp/datastore/pdf/temp/temp_image_file"
+      tempfile_path = "#{base_tempfile_path}.jpg"
+    
+      # Check if the file already exists
+      if File.exist?(tempfile_path)
+        # Generate a new unique file name
+        counter = 1
+        while File.exist?("#{base_tempfile_path}_#{counter}.jpg")
+          counter += 1
+        end
+    
+        # Update the tempfile_path with the new name
+        tempfile_path = "#{base_tempfile_path}_#{counter}.jpg"
+      end
+    
+      File.open(tempfile_path, 'wb') { |f| f.write(image_data) }
+    
+      # Perform OCR using Tesseract
+      ocr_text = RTesseract.new(tempfile_path).to_s.strip
+    
+      # Delete the temporary image file
+      File.delete(tempfile_path) if File.exist?(tempfile_path)
+    
+      return ocr_text
+    end
+
+    def add_ocr_to_pdf(pdf_path, file_set_id)
+      ocr_pdf_path = "/digicolapp/datastore/pdf/#{file_set_id}.pdf"
+  
+      # Convert PDF to images (one image per page)
+      `pdftoppm "#{pdf_path}" "#{ocr_pdf_path}" -png`
+  
+      # Perform OCR on each image and save the OCR'ed text to a file
+      Dir["#{ocr_pdf_path}-*.jpg"].each do |image_path|
+        `tesseract "#{image_path}" "#{image_path}_ocr" -l eng pdf`
+      end
+  
+      # Merge the OCR'ed text into a new PDF
+      `pdftk "#{ocr_pdf_path}-*.pdf" cat output "#{ocr_pdf_path}"`
+  
+      # Clean up temporary image files
+      Dir["#{ocr_pdf_path}-*.png"].each { |image_path| File.delete(image_path) }
+      Dir["#{ocr_pdf_path}-*.pdf"].each { |pdf| File.delete(pdf) }
+  
+      return ocr_pdf_path
+    end
+
+   
   end

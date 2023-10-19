@@ -1,6 +1,6 @@
 Rails.application.routes.draw do
 
-  get '/pdf/:file_set_id', to: 'pdf_generation#pdf', as: 'pdf'
+  get '/pdf/:ocr_checkbox/:file_set_id', to: 'pdf_generation#pdf', as: 'pdf'
 
   get 'pdf_generation/check_pdf_file_exists/:file_set_id', to: 'pdf_generation#check_pdf_file_exists'
 

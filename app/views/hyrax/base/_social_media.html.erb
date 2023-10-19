@@ -55,15 +55,18 @@
   <% if request.original_url =~ /\/(works|folios|subseries)\/(\w+)/ %>
     <% file_set_id = $2%>
 
-    <hr class="dotted" id="downloadButtonHR">
-    
-    <a id="downloadButton" href="<%= main_app.pdf_path(file_set_id: file_set_id) %>" target="_blank">
+    <hr class="dotted authBaseVisibility">
+
+    <input type="checkbox" id="ocrCheckbox" class="visibleToAdminOnly" />
+    <label class="visibleToAdminOnly" for="ocrCheckbox" style= "margin-bottom: 10px; font-weight: 0;">Enable OCR</label>
+
+    <a id="downloadButton" class="authBaseVisibility" href="<%= main_app.pdf_path(ocr_checkbox: 'false', file_set_id: file_set_id) %>" target="_blank">
         <br />
         Download PDF
         <br />
         <span class="fa fa-file-pdf-o fa-3x" style="color:#6d6d6d"></span>
         <br />  
-    </a>
+    </a>        
   <% end %>  
     <hr class="dotted">
   
@@ -132,15 +135,11 @@ $(document).ready(function() {
       type: 'GET',
       dataType: 'json',
       success: function(data) {
-        console.log(userIsSignedIn);
-        console.log(data.pdf_file_exists);
-        if (data.pdf_file_exists || userIsSignedIn()) {
-          $('#downloadButton').show();          
-          $('#downloadButtonHR').show();
-        } else {
-          $('#downloadButton').hide();
-          $('#downloadButtonHR').hide();
-        }
+        const authBaseVisibility = $('.authBaseVisibility');
+        const visibleToAdminOnly = $('.visibleToAdminOnly');
+        
+        authBaseVisibility.toggle(data.pdf_file_exists || userIsSignedIn());
+        visibleToAdminOnly.toggle(userIsSignedIn());
       },
       error: function(xhr, status, error) {
         console.error('Error checking PDF file existence:', error);
@@ -154,6 +153,19 @@ function userIsSignedIn() {
 }
 </script>
 
+
+<script>
+document.getElementById('ocrCheckbox').addEventListener('change', function() {
+    var isChecked = this.checked;
+    var downloadButton = document.getElementById('downloadButton');
+    
+    if (isChecked) {
+        downloadButton.href = '<%= main_app.pdf_path(ocr_checkbox: 'true', file_set_id: file_set_id) %>';
+    } else {
+        downloadButton.href = '<%= main_app.pdf_path(ocr_checkbox: 'false', file_set_id: file_set_id) %>';
+    }
+});
+</script>
 
 
 
