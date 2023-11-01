@@ -6,14 +6,30 @@ require 'prawn'
 require 'mini_magick'
 require 'rtesseract'
 require 'tempfile' 
+require 'uri'
+require 'pdf-reader'
+require 'pdfkit'
 
 
 class PdfGenerationController < ApplicationController    
     Encoding.default_external = Encoding::UTF_8
-    
+    # def solrdata
+    #   Rails.logger.debug "version 1.0.6 initiated..."
+    #   solr_service = SolrService.new
+    #   ids = solr_service.fetch_all_ids
+    #   ids.each do |id|
+    #     fields = solr_service.fetch_fields_by_id(id)
+    #     solr_service.replace_and_update_urls(id, fields)
+    #   end
+    #   Rails.logger.debug "Debug message: SHESHHHHHHHHHHHHHHHHhhh"
+  
+    #   flash[:success] = 'Processing completed.'
+    #   redirect_to root_path
+    # end
+
     def pdf   
       begin   
-        Rails.logger.debug "version 8.0.4 initiated..."
+        Rails.logger.debug "version 9.0.2 initiated..."
         work_id = params[:file_set_id]        
         ocr_checkbox_val = params[:ocr_checkbox]      
 
@@ -138,19 +154,20 @@ class PdfGenerationController < ApplicationController
         
         # Initialize a flag to check if any images have been added
         images_added = false
-    
+        ocr_text = ''
+
         paths.each do |url|
           # Get the image data
           image_data = URI.open(url).read
 
-
           if ocr_checkbox_val.to_s == "true"
-            Rails.logger.debug "ocr_checkbox_val: #{ocr_checkbox_val}"
             # Perform OCR on the image and get the extracted text
             extracted_text = perform_ocr(image_data)
             Rails.logger.debug "Debug message: #{extracted_text}"
+            ocr_text << extracted_text << ' '  
+
             # Embed the extracted OCR text into the PDF
-            pdf.text(extracted_text) if extracted_text.present?
+            # pdf.text(extracted_text) if extracted_text.present?
           end
 
           # Resize and compress the image
@@ -189,8 +206,10 @@ class PdfGenerationController < ApplicationController
         if ocr_checkbox_val.to_s == "true"
           pdf_filename = "OCR_enabled_pdf_#{file_set_id}.pdf"
           # Perform OCR on the entire PDF to make it searchable
-          final_pdf_path = add_ocr_to_pdf(pdf_path, file_set_id)
+          final_pdf_path = add_ocr_to_pdf(pdf_path, file_set_id, ocr_text)
           Rails.logger.debug "final_pdf_path: #{final_pdf_path}"
+          # Highlight text in the PDF
+          highlight_text(final_pdf_path, ocr_text)
           # Send the existing PDF file to the user
           send_file final_pdf_path, filename: pdf_filename, type: 'application/pdf', disposition: 'inline'
         else
@@ -331,26 +350,192 @@ class PdfGenerationController < ApplicationController
       return ocr_text
     end
 
-    def add_ocr_to_pdf(pdf_path, file_set_id)
+    # def add_ocr_to_pdf(pdf_path, file_set_id, ocr_text)
+    #   ocr_pdf_path = "/digicolapp/datastore/pdf/#{file_set_id}.pdf"
+  
+    #   # Convert PDF to images (one image per page)
+    #   `pdftoppm "#{pdf_path}" "#{ocr_pdf_path}" -png`
+  
+    #   # Perform OCR on each image and save the OCR'ed text to a file
+    #   Dir["#{ocr_pdf_path}-*.jpg"].each do |image_path|
+    #     `tesseract "#{image_path}" "#{image_path}_ocr" -l eng pdf`
+    #   end
+  
+    #   # Merge the OCR'ed text into a new PDF
+    #   `pdftk "#{ocr_pdf_path}-*.pdf" cat output "#{ocr_pdf_path}"`
+
+    #   # Add the searchable text as metadata
+    #   `pdftk "#{ocr_pdf_path}" update_info_utf8 "InfoShort: #{ocr_text}" output "#{ocr_pdf_path}"`
+  
+    #   # Clean up temporary image files
+    #   Dir["#{ocr_pdf_path}-*.png"].each { |image_path| File.delete(image_path) }
+    #   Dir["#{ocr_pdf_path}-*.pdf"].each { |pdf| File.delete(pdf) }
+  
+    #   return ocr_pdf_path
+    # end
+
+   
+
+    def add_ocr_to_pdf(pdf_path, file_set_id, ocr_text)
       ocr_pdf_path = "/digicolapp/datastore/pdf/#{file_set_id}.pdf"
-  
-      # Convert PDF to images (one image per page)
-      `pdftoppm "#{pdf_path}" "#{ocr_pdf_path}" -png`
-  
-      # Perform OCR on each image and save the OCR'ed text to a file
-      Dir["#{ocr_pdf_path}-*.jpg"].each do |image_path|
-        `tesseract "#{image_path}" "#{image_path}_ocr" -l eng pdf`
-      end
-  
-      # Merge the OCR'ed text into a new PDF
-      `pdftk "#{ocr_pdf_path}-*.pdf" cat output "#{ocr_pdf_path}"`
-  
-      # Clean up temporary image files
-      Dir["#{ocr_pdf_path}-*.png"].each { |image_path| File.delete(image_path) }
-      Dir["#{ocr_pdf_path}-*.pdf"].each { |pdf| File.delete(pdf) }
-  
+      
+      # Create a new PDF document with the extracted OCR text
+      pdf = Prawn::Document.new
+      pdf.text(ocr_text)
+      pdf_filename = "/digicolapp/datastore/pdf/#{file_set_id}_ocr.pdf"
+      pdf.render_file(pdf_filename)
+    
+      # Use pdfkit to merge the OCR text PDF with the original PDF
+      kit = PDFKit.new(pdf_filename)
+      kit.to_file(ocr_pdf_path)
+    
+      # Clean up the temporary OCR PDF file
+      File.delete(pdf_filename) if File.exist?(pdf_filename)
+    
       return ocr_pdf_path
     end
+    
+    
+
+    # Define the highlight_text method to highlight text in the PDF
+    def highlight_text(pdf_path, text_to_highlight)
+      reader = PDF::Reader.new(pdf_path)
+      pdf = MiniMagick::Image.open(pdf_path)
+      pdf_height = pdf.height
+      pdf_width = pdf.width
+
+      reader.pages.each do |page|
+        page.text.scan(/#{Regexp.quote(text_to_highlight)}/i) do |match|
+          x = match[:x].to_f * pdf_width
+          y = (1.0 - match[:y].to_f) * pdf_height
+          width = match[:width].to_f * pdf_width
+          height = match[:height].to_f * pdf_height
+          page_number = page.number - 1
+
+          pdf.combine_options do |c|
+            c.fill('yellow')
+            c.stroke('none')
+            c.rectangle(x, y, x + width, y + height)
+            c.draw('image Over')
+          end
+        end
+      end
+
+      pdf.write(pdf_path)
+    end
+
+
+
+
+
+    # Define the highlight_text method to highlight text in the PDF
+    # def highlight_text(pdf_path, text_to_highlight)
+    #   reader = PDF::Reader.new(pdf_path)
+    #   pdf = Magick::ImageList.new(pdf_path)
+    #   pdf.each_with_index do |img, page_number|
+    #     text_to_highlight.split(' ').each do |word|
+    #       reader.pages[page_number].text.scan(/#{Regexp.quote(word)}/i) do |match|
+    #         x = match[:x].to_i
+    #         y = match[:y].to_i
+    #         width = match[:width].to_i
+    #         height = match[:height].to_i
+    #         img.annotate(Magick::Draw.new.fill('yellow').opacity(0.3), x, y, x + width, y + height, word)
+    #       end
+    #     end
+    #   end
+    #   pdf.write(pdf_path)
+    # end
+
+
+    # Add OCR text highlights to the PDF
+    # def add_ocr_text_highlights(pdf, ocr_results)
+    #   # Iterate through OCR results
+    #   ocr_results.each do |result|
+    #     text = result[:text]
+    #     coordinates = result[:coordinates] # {x: x_value, y: y_value, width: width_value, height: height_value}
+
+    #     # Highlight the text on the PDF
+    #     pdf.bounding_box([coordinates[:x], coordinates[:y] + coordinates[:height]], width: coordinates[:width], height: coordinates[:height]) do
+    #       pdf.transparent(0.5) do
+    #         pdf.fill_color "FFFF00" # Highlight color (yellow)
+    #         pdf.fill_rectangle [0, coordinates[:height]], coordinates[:width], coordinates[:height]
+    #       end
+    #     end
+
+    #     # Add the OCR text to the PDF
+    #     pdf.bounding_box([coordinates[:x], coordinates[:y]], width: coordinates[:width], height: coordinates[:height]) do
+    #       pdf.text text, color: "000000" # Text color (black)
+    #     end
+    #   end
+    # end
 
    
   end
+
+  # class SolrService   
+  #   # attr_reader :solr
+  
+  #   # def initialize
+  #     $solr = RSolr.connect(url: 'http://dcdev-solr.tcd.ie:8983/solr/tcd-hyrax/') 
+  #   # end
+  
+  #   def fetch_all_ids
+  #     response = $solr.get('select', params: { q: '*:*', fl: 'id', rows: 0 })
+  #     total_docs = response['response']['numFound']
+  #     ids = []
+  
+  #     response = $solr.get('select', params: { q: '*:*', fl: 'id', rows: total_docs })
+  #     ids = response['response']['docs'].map { |doc| doc['id'] }
+  
+  #     ids
+  #   end
+  
+  #   def fetch_fields_by_id(id)
+  #     response = $solr.get('select', params: { q: "id:#{id}" })
+  #     doc = response['response']['docs'].first
+  #     {
+  #       id: id,
+  #       finding_aid_tesim: doc['finding_aid_tesim'],
+  #       abstract_tesim: doc['abstract_tesim'],
+  #       related_url_tesim: doc['related_url_tesim']
+  #     }
+  #   end
+  
+  #   def replace_and_update_urls(id, fields)
+  #     updated_fields = {
+  #       id: id,
+  #       finding_aid_tesim: replace_urls_in_array(fields[:finding_aid_tesim]),
+  #       abstract_tesim: replace_urls_in_array(fields[:abstract_tesim]),
+  #       related_url_tesim: replace_urls_in_array(fields[:related_url_tesim])
+  #     }
+  #     $solr.add(updated_fields)
+  #     $solr.commit
+  #   end
+  
+  #   private
+  
+  #   def replace_urls(text)
+  #     return text unless text
+  #     text.gsub(/https:\/\/manuscripts.catalogue.tcd.ie\/CalmView\/Record.aspx\?src=CalmView.Catalog&id=.*?&pos=1/, 'https://www.tcd.ie/library/research-collections/manuscriptsarchivescatalogue/index.ph')
+  #   end
+  
+  #   def replace_urls_in_array(array)
+  #     return array unless array
+  #     array.map { |item| replace_urls(item) }
+  #   end
+
+
+  #    # def replace_and_update_urls(id, fields)
+  #   #   updated_fields = fields.transform_values { |value| replace_urls(value) }
+  #   #   $solr.add(updated_fields.merge(id: id))
+  #   #   $solr.commit
+  #   # end
+  
+  #   # private
+  
+  #   # def replace_urls(text)
+  #   #   return text unless text
+  #   #   text.gsub(/https:\/\/manuscripts.catalogue.tcd.ie\/CalmView\/Record.aspx\?src=CalmView.Catalog&id=.*?&pos=1/, 'https://www.tcd.ie/library/research-collections/manuscriptsarchivescatalogue/index.ph')
+  #   # end
+
+  # end

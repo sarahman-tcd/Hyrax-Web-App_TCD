@@ -57,6 +57,10 @@
 
     <hr class="dotted authBaseVisibility">
 
+    # <a href="#" id="solrdata" class="btn btn-primary">Process Solr Data</a>
+    # <br />
+   
+
     <input type="checkbox" id="ocrCheckbox" class="visibleToAdminOnly" />
     <label class="visibleToAdminOnly" for="ocrCheckbox" style= "margin-bottom: 10px; font-weight: 0;">Enable OCR</label>
 
@@ -170,3 +174,22 @@ document.getElementById('ocrCheckbox').addEventListener('change', function() {
 
 
 
+# <script>
+#   document.getElementById('solrdata').addEventListener('click', function(event) {
+#     event.preventDefault(); 
+
+#     fetch('/pdf_generation/solrdata', {
+#       method: 'GET'
+#     })
+#     .then(response => {
+#       if (response.ok) {
+#         alert('Processing completed.');
+#       } else {
+#         alert('An error occurred during processing.');
+#       }
+#     })
+#     .catch(error => {
+#       alert('Network error: ' + error.message);
+#     });
+#   });
+# </script>
