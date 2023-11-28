@@ -29,7 +29,7 @@ class PdfGenerationController < ApplicationController
 
     def pdf   
       begin   
-        Rails.logger.debug "version 9.0.2 initiated..."
+        Rails.logger.debug "version 11.1.4 initiated..."
         work_id = params[:file_set_id]        
         ocr_checkbox_val = params[:ocr_checkbox]      
 
@@ -143,7 +143,7 @@ class PdfGenerationController < ApplicationController
       end
     end   
     
-    def generate_and_download_pdf(paths, file_set_id, title, shelf_mark, doi, creator, contributor, date_created, ocr_checkbox_val)
+    def old_generate_and_download_pdf(paths, file_set_id, title, shelf_mark, doi, creator, contributor, date_created, ocr_checkbox_val)
       begin
         # Create a new PDF document
         pdf = Prawn::Document.new
@@ -205,13 +205,20 @@ class PdfGenerationController < ApplicationController
         
         if ocr_checkbox_val.to_s == "true"
           pdf_filename = "OCR_enabled_pdf_#{file_set_id}.pdf"
-          # Perform OCR on the entire PDF to make it searchable
-          final_pdf_path = add_ocr_to_pdf(pdf_path, file_set_id, ocr_text)
-          Rails.logger.debug "final_pdf_path: #{final_pdf_path}"
-          # Highlight text in the PDF
-          highlight_text(final_pdf_path, ocr_text)
-          # Send the existing PDF file to the user
-          send_file final_pdf_path, filename: pdf_filename, type: 'application/pdf', disposition: 'inline'
+          # Extract OCR text and coordinates
+          ocr_text = ocr_result[:text]
+          ocr_coordinates = ocr_result[:coordinates]
+
+          # Create a new PDF with OCR text as invisible annotations
+          pdf_with_annotations = Prawn::Document.new
+          add_ocr_annotations_with_coordinates(pdf_with_annotations, ocr_coordinates)
+
+          # Save the PDF with annotations
+          final_pdf_with_annotations_path = "/digicolapp/datastore/pdf/#{file_set_id}_with_annotations.pdf"
+          pdf_with_annotations.render_file(final_pdf_with_annotations_path)
+
+          # Send the PDF with annotations to the user
+          send_file final_pdf_with_annotations_path, filename: pdf_filename, type: 'application/pdf', disposition: 'inline'
         else
           # Send the existing PDF file to the user
           send_file pdf_path, filename: pdf_filename, type: 'application/pdf', disposition: 'inline'
@@ -232,7 +239,89 @@ class PdfGenerationController < ApplicationController
       end
     end
     
+    def generate_and_download_pdf(paths, file_set_id, title, shelf_mark, doi, creator, contributor, date_created, ocr_checkbox_val)
+      begin
+        # Create a new PDF document
+        pdf = Prawn::Document.new
     
+        # Add a title page
+        add_title_page(pdf, title, shelf_mark, doi, creator, contributor, date_created, '/opt/app/TCD-Hyrax-Web-App/tcd-logo-2x.png') 
+        pdf.start_new_page
+        
+        # Initialize a flag to check if any images have been added
+        images_added = false
+        ocr_text = ''
+        ocr_coordinates = []
+    
+        paths.each do |url|
+          # Get the image data
+          image_data = URI.open(url).read
+    
+          if ocr_checkbox_val.to_s == "true"
+            # Perform OCR on the image and get the extracted text and coordinates
+            result = perform_ocr_with_coordinates_single_image(image_data)
+    
+            # Concatenate the OCR text
+            ocr_text << result[:text] << ' '
+    
+            # Add the coordinates to the overall coordinates array
+            ocr_coordinates.concat(result[:coordinates])
+          end
+    
+          # Resize and compress the image
+          resized_image_data = resize_image(image_data)
+    
+          # If images haven't been added yet, don't start a new page
+          if images_added 
+            pdf.start_new_page
+          else
+            images_added = true
+          end
+    
+          # Check the dimensions of the image
+          image = MiniMagick::Image.read(resized_image_data)
+          image_width= image.width
+          image_height = image.height
+    
+          # Add the compressed image to the PDF
+          if image_width > image_height && image_width > pdf.bounds.width
+            # Landscape image
+            pdf.image StringIO.new(resized_image_data), width: pdf.bounds.width, position: :left
+          elsif image_height > image_width && image_height > pdf.bounds.height
+            # Portrait image
+            pdf.image StringIO.new(resized_image_data), height: pdf.bounds.height, position: :center
+          else
+            # Regular image
+            pdf.image StringIO.new(resized_image_data), width: pdf.bounds.width, height: pdf.bounds.height, position: :center
+          end
+        end
+       
+        # Save the PDF to a file
+        pdf_filename = "#{file_set_id}.pdf"
+        pdf_path = "/digicolapp/datastore/pdf/#{pdf_filename}"           
+        pdf.render_file(pdf_path)
+        
+        if ocr_checkbox_val.to_s == "true"
+          pdf_filename = "OCR_enabled_pdf_#{file_set_id}.pdf"
+          # Add OCR text as invisible annotations
+          pdf_with_annotations = Prawn::Document.new
+          add_ocr_annotations_with_coordinates(pdf_with_annotations, ocr_coordinates, ocr_text)
+    
+          # Save the PDF with annotations
+          final_pdf_with_annotations_path = "/digicolapp/datastore/pdf/#{file_set_id}_with_annotations.pdf"
+          pdf_with_annotations.render_file(final_pdf_with_annotations_path)
+    
+          # Send the PDF with annotations to the user
+          send_file final_pdf_with_annotations_path, filename: pdf_filename, type: 'application/pdf', disposition: 'inline'
+        else
+          # Send the existing PDF file to the user
+          send_file pdf_path, filename: pdf_filename, type: 'application/pdf', disposition: 'inline'
+        end
+      rescue => e
+        backtrace = e.backtrace.first
+        Rails.logger.error "Error: #{e.message}, Raised at: #{backtrace}"
+      end
+    end
   
     private
   
@@ -322,60 +411,6 @@ class PdfGenerationController < ApplicationController
       end
     end
 
-    # OCR enabled PDF
-    def perform_ocr(image_data)
-      base_tempfile_path = "/digicolapp/datastore/pdf/temp/temp_image_file"
-      tempfile_path = "#{base_tempfile_path}.jpg"
-    
-      # Check if the file already exists
-      if File.exist?(tempfile_path)
-        # Generate a new unique file name
-        counter = 1
-        while File.exist?("#{base_tempfile_path}_#{counter}.jpg")
-          counter += 1
-        end
-    
-        # Update the tempfile_path with the new name
-        tempfile_path = "#{base_tempfile_path}_#{counter}.jpg"
-      end
-    
-      File.open(tempfile_path, 'wb') { |f| f.write(image_data) }
-    
-      # Perform OCR using Tesseract
-      ocr_text = RTesseract.new(tempfile_path).to_s.strip
-    
-      # Delete the temporary image file
-      File.delete(tempfile_path) if File.exist?(tempfile_path)
-    
-      return ocr_text
-    end
-
-    # def add_ocr_to_pdf(pdf_path, file_set_id, ocr_text)
-    #   ocr_pdf_path = "/digicolapp/datastore/pdf/#{file_set_id}.pdf"
-  
-    #   # Convert PDF to images (one image per page)
-    #   `pdftoppm "#{pdf_path}" "#{ocr_pdf_path}" -png`
-  
-    #   # Perform OCR on each image and save the OCR'ed text to a file
-    #   Dir["#{ocr_pdf_path}-*.jpg"].each do |image_path|
-    #     `tesseract "#{image_path}" "#{image_path}_ocr" -l eng pdf`
-    #   end
-  
-    #   # Merge the OCR'ed text into a new PDF
-    #   `pdftk "#{ocr_pdf_path}-*.pdf" cat output "#{ocr_pdf_path}"`
-
-    #   # Add the searchable text as metadata
-    #   `pdftk "#{ocr_pdf_path}" update_info_utf8 "InfoShort: #{ocr_text}" output "#{ocr_pdf_path}"`
-  
-    #   # Clean up temporary image files
-    #   Dir["#{ocr_pdf_path}-*.png"].each { |image_path| File.delete(image_path) }
-    #   Dir["#{ocr_pdf_path}-*.pdf"].each { |pdf| File.delete(pdf) }
-  
-    #   return ocr_pdf_path
-    # end
-
-   
-
     def add_ocr_to_pdf(pdf_path, file_set_id, ocr_text)
       ocr_pdf_path = "/digicolapp/datastore/pdf/#{file_set_id}.pdf"
       
@@ -387,15 +422,14 @@ class PdfGenerationController < ApplicationController
     
       # Use pdfkit to merge the OCR text PDF with the original PDF
       kit = PDFKit.new(pdf_filename)
+      Rails.logger.error "Executing PDFKit command: #{kit.command}"
       kit.to_file(ocr_pdf_path)
     
       # Clean up the temporary OCR PDF file
       File.delete(pdf_filename) if File.exist?(pdf_filename)
     
       return ocr_pdf_path
-    end
-    
-    
+    end    
 
     # Define the highlight_text method to highlight text in the PDF
     def highlight_text(pdf_path, text_to_highlight)
@@ -424,53 +458,234 @@ class PdfGenerationController < ApplicationController
       pdf.write(pdf_path)
     end
 
+    def add_ocr_annotations_with_coordinates(pdf, ocr_coordinates, ocr_text)
 
+      Rails.logger.debug "Adding OCR annotations with coordinates: #{ocr_coordinates}"
+      # Rails.logger.debug "OCR Text: #{ocr_text}"
+      # Add OCR text as invisible annotations on each page
+      pdf.page_count.times do |page_number|
+        pdf.go_to_page(page_number + 1)
+    
+        pdf.start_new_page if page_number > 0 # Start a new page for each page except the first one
+    
+        pdf.canvas do
+          # pdf.transparent(0) do
+            # Add an invisible text box with OCR text as an annotation at specified coordinates
+            ocr_coordinates.each do |coords|
+              pdf.bounding_box([coords[:x], coords[:y]], width: coords[:width], height: coords[:height]) do
+                pdf.text(ocr_text, color: "000000") # White text for invisibility
+              end
+            end
+          # end
+        end
+      end
+    end
+    
+    # --------------------------------------------------------------
 
+    def perform_ocr(image_data)
+      base_tempfile_path = "/digicolapp/datastore/pdf/temp/temp_image_file"
+      tempfile_path = "#{base_tempfile_path}.jpg"
+    
+      # Check if the file already exists
+      # if File.exist?(tempfile_path)
+      #   # Generate a new unique file name
+      #   counter = 1
+      #   while File.exist?("#{base_tempfile_path}_#{counter}.jpg")
+      #     counter += 1
+      #   end
+    
+      #   # Update the tempfile_path with the new name
+      #   tempfile_path = "#{base_tempfile_path}_#{counter}.jpg"
+      # end
+    
+      File.open(tempfile_path, 'wb') { |f| f.write(image_data) }
+    
+      # Perform OCR using Tesseract and output as plain text
+      ocr_result = RTesseract.new(tempfile_path, processor: :mini_magick) do |r|
+        r.whitelist = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,?!"\' '
+      end.to_s.strip
+      # Rails.logger.debug "OCR result: #{ocr_result}"
+    
+      # Delete the temporary image file
+      File.delete(tempfile_path) if File.exist?(tempfile_path)
+    
+      words_and_coordinates = extract_words_and_coordinates(ocr_result)
 
-
-    # Define the highlight_text method to highlight text in the PDF
-    # def highlight_text(pdf_path, text_to_highlight)
-    #   reader = PDF::Reader.new(pdf_path)
-    #   pdf = Magick::ImageList.new(pdf_path)
-    #   pdf.each_with_index do |img, page_number|
-    #     text_to_highlight.split(' ').each do |word|
-    #       reader.pages[page_number].text.scan(/#{Regexp.quote(word)}/i) do |match|
-    #         x = match[:x].to_i
-    #         y = match[:y].to_i
-    #         width = match[:width].to_i
-    #         height = match[:height].to_i
-    #         img.annotate(Magick::Draw.new.fill('yellow').opacity(0.3), x, y, x + width, y + height, word)
-    #       end
+      return words_and_coordinates
+    end
+    
+    def extract_words_and_coordinates(ocr_text)
+      words_and_coordinates = []
+      current_coordinates = []
+    
+      ocr_text.lines.each do |line|
+        words = line.scan(/\S+/)
+    
+        words.each do |word|
+          coordinates_match = word.match(/\A(-?\d+(\.\d+)?)\z/)
+    
+          if coordinates_match
+            current_coordinates << coordinates_match[1].to_f
+          else
+            unless current_coordinates.empty?
+              # Assume every two consecutive numbers form a coordinate pair
+              if current_coordinates.size.even?
+                coordinates = current_coordinates.each_slice(2).map { |coords_slice| coords_slice }
+                coordinates.each do |coords|
+                  words_and_coordinates << {
+                    text: '',  # Empty string, adjust as needed
+                    coordinates: {
+                      x: coords[0] || 0,
+                      y: coords[1] || 0,
+                      width: 0,  # Adjust as needed
+                      height: 0  # Adjust as needed
+                    }
+                  }
+                end
+              end
+              current_coordinates.clear
+            end
+          end
+        end
+      end
+    
+      words_and_coordinates
+    end
+    
+    
+    
+    # def extract_words_and_coordinates(ocr_text)
+    #   words_and_coordinates = []      
+    #   ocr_text.lines.each do |line|        
+    #     # Try different regular expression patterns
+    #     match = line.match(/(\S+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+(\.\d+)?)/) ||
+    #             line.match(/(\S+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)/) ||
+    #             line.match(/(\S+)\s+(-?\d+(\.\d+)?)\s+(-?\d+(\.\d+)?)\s+(-?\d+(\.\d+)?)\s+(-?\d+(\.\d+)?)/) ||
+    #             line.match(/(\S+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(\S+)/)||
+    #             line.match(/(\S+)\s*(-?\d+(\.\d+)?)\s*(-?\d+(\.\d+)?)\s*(-?\d+(\.\d+)?)\s*(-?\d+(\.\d+)?)/)
+    
+    #     if match
+    #       Rails.logger.debug "dhukce" 
+    #       word = match[1]
+    #       left_top_x = match[2].to_i
+    #       left_top_y = match[3].to_i
+    #       right_bottom_x = match[4].to_i
+    #       right_bottom_y = match[5].to_i
+    
+    #       # Calculate width and height from coordinates
+    #       width = right_bottom_x - left_top_x
+    #       height = right_bottom_y - left_top_y
+    #       Rails.logger.debug "OCR linewidth: #{width}" # Debugging statement
+    #       words_and_coordinates << { text: word, coordinates: { x: left_top_x, y: left_top_y, width: width, height: height } }
     #     end
     #   end
-    #   pdf.write(pdf_path)
+    
+    #   return words_and_coordinates
     # end
 
+    
+    
+    
+    def perform_ocr_with_coordinates_single_image(image_data)
+      # Perform OCR and extract words and coordinates
+      words_and_coordinates = perform_ocr(image_data)
+      Rails.logger.debug "OCR words_and_coordinates: #{words_and_coordinates}"
+      ocr_text = ''
+      ocr_coordinates = []
+    
+      words_and_coordinates.each do |word_data|
+        word_text = word_data[:text]
+        coordinates = word_data[:coordinates]
+    
+        # Add the word text to the overall OCR text
+        ocr_text << word_text << ' '
+    
+        # Add the coordinates to the overall coordinates array
+        ocr_coordinates << coordinates
+      end
+    
+      # Remove trailing whitespace from OCR text
+      ocr_text.strip!
+    
+      return { text: ocr_text, coordinates: ocr_coordinates }
+    end
+    
 
-    # Add OCR text highlights to the PDF
-    # def add_ocr_text_highlights(pdf, ocr_results)
-    #   # Iterate through OCR results
-    #   ocr_results.each do |result|
-    #     text = result[:text]
-    #     coordinates = result[:coordinates] # {x: x_value, y: y_value, width: width_value, height: height_value}
+    def perform_ocr_with_coordinates(paths)
+      ocr_text = ''
+      ocr_coordinates = []
 
-    #     # Highlight the text on the PDF
-    #     pdf.bounding_box([coordinates[:x], coordinates[:y] + coordinates[:height]], width: coordinates[:width], height: coordinates[:height]) do
-    #       pdf.transparent(0.5) do
-    #         pdf.fill_color "FFFF00" # Highlight color (yellow)
-    #         pdf.fill_rectangle [0, coordinates[:height]], coordinates[:width], coordinates[:height]
-    #       end
-    #     end
+      paths.each do |url|
+        # Get the image data
+        image_data = URI.open(url).read
 
-    #     # Add the OCR text to the PDF
-    #     pdf.bounding_box([coordinates[:x], coordinates[:y]], width: coordinates[:width], height: coordinates[:height]) do
-    #       pdf.text text, color: "000000" # Text color (black)
-    #     end
-    #   end
-    # end
+        # Perform OCR on the image and get the extracted text and coordinates
+        result = perform_ocr_with_coordinates_single_image(image_data)
 
+        # Concatenate the OCR text
+        ocr_text << result[:text] << ' '
+
+        # Add the coordinates to the overall coordinates array
+        ocr_coordinates.concat(result[:coordinates])
+      end
+
+      return { text: ocr_text.strip, coordinates: ocr_coordinates }
+    end
    
   end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
   # class SolrService   
   #   # attr_reader :solr
