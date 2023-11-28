@@ -56,17 +56,13 @@
     <% file_set_id = $2%>
 
     <hr class="dotted authBaseVisibility">   
-
-    <input type="checkbox" id="ocrCheckbox" class="visibleToAdminOnly" />
-    <label class="visibleToAdminOnly" for="ocrCheckbox" style= "margin-bottom: 10px; font-weight: 0;">Enable OCR</label>
-
-    <a id="downloadButton" class="authBaseVisibility" href="<%= main_app.pdf_path(ocr_checkbox: 'false', file_set_id: file_set_id) %>" target="_blank">
+    <a id="downloadButton" class="authBaseVisibility" href="<%= main_app.pdf_path(file_set_id: file_set_id) %>" target="_blank">
         <br />
         Download PDF
         <br />
         <span class="fa fa-file-pdf-o fa-3x" style="color:#6d6d6d"></span>
         <br />  
-    </a>        
+    </a>      
   <% end %>  
     <hr class="dotted">
   
@@ -154,38 +150,3 @@ function userIsSignedIn() {
 </script>
 
 
-<script>
-document.getElementById('ocrCheckbox').addEventListener('change', function() {
-    var isChecked = this.checked;
-    var downloadButton = document.getElementById('downloadButton');
-    
-    if (isChecked) {
-        downloadButton.href = '<%= main_app.pdf_path(ocr_checkbox: 'true', file_set_id: file_set_id) %>';
-    } else {
-        downloadButton.href = '<%= main_app.pdf_path(ocr_checkbox: 'false', file_set_id: file_set_id) %>';
-    }
-});
-</script>
-
-
-
-
-# <script>
-#   document.getElementById('solrdata').addEventListener('click', function(event) {
-#     event.preventDefault(); 
-
-#     fetch('/pdf_generation/solrdata', {
-#       method: 'GET'
-#     })
-#     .then(response => {
-#       if (response.ok) {
-#         alert('Processing completed.');
-#       } else {
-#         alert('An error occurred during processing.');
-#       }
-#     })
-#     .catch(error => {
-#       alert('Network error: ' + error.message);
-#     });
-#   });
-# </script>
