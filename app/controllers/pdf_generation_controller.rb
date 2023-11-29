@@ -28,8 +28,8 @@ class PdfGenerationController < ApplicationController
 
         # Change the url for LIVE
         dev = 'http://dcdev-solr.tcd.ie:8983/solr/tcd-hyrax/'
-        primary01 = 'http://digcoll-solr01.tcd.ie:8983/solr/tcd-hyrax/'
-        $solr = RSolr.connect(url: dev) 
+        primary = 'http://digcoll-solr01.tcd.ie:8983/solr/tcd-hyrax/'
+        $solr = RSolr.connect(url: primary) 
         work_response = $solr.get('select', params: { q: "id:#{work_id}" })
         work_data = work_response['response']['docs'][0]        
     
