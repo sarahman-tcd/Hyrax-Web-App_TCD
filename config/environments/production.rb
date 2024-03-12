@@ -58,6 +58,8 @@ Rails.application.configure do
 
   # Use a different cache store in production.
   # config.cache_store = :mem_cache_store
+  config.cache_store = :redis_cache_store, { url: ENV['RAILS_CACHE_STORE_URL'] }
+  config.middleware.insert_before ActionDispatch::Static, NoCacheMiddleware, [/concern\/.*\/.*\/edit/, /concern\/.*\/.*\/new/, /dashboard\/.*\/.*\/edit/, /uploaded_collection_thumbnails/]
 
   # Use a real queuing backend for Active Job (and separate queues per environment)
   # config.active_job.queue_adapter     = :resque
