@@ -10,7 +10,6 @@ require 'uri'
 require 'pdf-reader'
 require 'pdfkit'
 
-
 class PdfGenerationController < ApplicationController    
     Encoding.default_external = Encoding::UTF_8
     # def solrdata
@@ -29,7 +28,7 @@ class PdfGenerationController < ApplicationController
 
     def pdf   
       begin   
-        Rails.logger.debug "version 11.1.4 initiated..."
+        Rails.logger.debug "version 12.1.1 initiated..."
         work_id = params[:file_set_id]        
         ocr_checkbox_val = params[:ocr_checkbox]      
 
@@ -257,16 +256,16 @@ class PdfGenerationController < ApplicationController
           # Get the image data
           image_data = URI.open(url).read
     
-          if ocr_checkbox_val.to_s == "true"
-            # Perform OCR on the image and get the extracted text and coordinates
-            result = perform_ocr_with_coordinates_single_image(image_data)
+          # if ocr_checkbox_val.to_s == "true"
+          #   # Perform OCR on the image and get the extracted text and coordinates
+          #   result = perform_ocr_with_coordinates_single_image(image_data)
     
-            # Concatenate the OCR text
-            ocr_text << result[:text] << ' '
+          #   # Concatenate the OCR text
+          #   ocr_text << result[:text] << ' '
     
-            # Add the coordinates to the overall coordinates array
-            ocr_coordinates.concat(result[:coordinates])
-          end
+          #   # Add the coordinates to the overall coordinates array
+          #   ocr_coordinates.concat(result[:coordinates])
+          # end
     
           # Resize and compress the image
           resized_image_data = resize_image(image_data)
@@ -294,29 +293,19 @@ class PdfGenerationController < ApplicationController
             # Regular image
             pdf.image StringIO.new(resized_image_data), width: pdf.bounds.width, height: pdf.bounds.height, position: :center
           end
+
+          if ocr_checkbox_val.to_s == "true"
+            add_ocr_text(pdf, resized_image_data)
+          end
         end
-       
+               
+
         # Save the PDF to a file
         pdf_filename = "#{file_set_id}.pdf"
         pdf_path = "/digicolapp/datastore/pdf/#{pdf_filename}"           
         pdf.render_file(pdf_path)
         
-        if ocr_checkbox_val.to_s == "true"
-          pdf_filename = "OCR_enabled_pdf_#{file_set_id}.pdf"
-          # Add OCR text as invisible annotations
-          pdf_with_annotations = Prawn::Document.new
-          add_ocr_annotations_with_coordinates(pdf_with_annotations, ocr_coordinates, ocr_text)
-    
-          # Save the PDF with annotations
-          final_pdf_with_annotations_path = "/digicolapp/datastore/pdf/#{file_set_id}_with_annotations.pdf"
-          pdf_with_annotations.render_file(final_pdf_with_annotations_path)
-    
-          # Send the PDF with annotations to the user
-          send_file final_pdf_with_annotations_path, filename: pdf_filename, type: 'application/pdf', disposition: 'inline'
-        else
-          # Send the existing PDF file to the user
-          send_file pdf_path, filename: pdf_filename, type: 'application/pdf', disposition: 'inline'
-        end
+        send_file pdf_path, filename: pdf_filename, type: 'application/pdf', disposition: 'inline'
       rescue => e
         backtrace = e.backtrace.first
         Rails.logger.error "Error: #{e.message}, Raised at: #{backtrace}"
@@ -411,6 +400,9 @@ class PdfGenerationController < ApplicationController
       end
     end
 
+     
+
+    # Define the highlight_text method to highlight text in the PDF
     def add_ocr_to_pdf(pdf_path, file_set_id, ocr_text)
       ocr_pdf_path = "/digicolapp/datastore/pdf/#{file_set_id}.pdf"
       
@@ -429,9 +421,8 @@ class PdfGenerationController < ApplicationController
       File.delete(pdf_filename) if File.exist?(pdf_filename)
     
       return ocr_pdf_path
-    end    
+    end  
 
-    # Define the highlight_text method to highlight text in the PDF
     def highlight_text(pdf_path, text_to_highlight)
       reader = PDF::Reader.new(pdf_path)
       pdf = MiniMagick::Image.open(pdf_path)
@@ -481,8 +472,7 @@ class PdfGenerationController < ApplicationController
       end
     end
     
-    # --------------------------------------------------------------
-
+    
     def perform_ocr(image_data)
       base_tempfile_path = "/digicolapp/datastore/pdf/temp/temp_image_file"
       tempfile_path = "#{base_tempfile_path}.jpg"
@@ -554,39 +544,6 @@ class PdfGenerationController < ApplicationController
     end
     
     
-    
-    # def extract_words_and_coordinates(ocr_text)
-    #   words_and_coordinates = []      
-    #   ocr_text.lines.each do |line|        
-    #     # Try different regular expression patterns
-    #     match = line.match(/(\S+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+(\.\d+)?)/) ||
-    #             line.match(/(\S+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)/) ||
-    #             line.match(/(\S+)\s+(-?\d+(\.\d+)?)\s+(-?\d+(\.\d+)?)\s+(-?\d+(\.\d+)?)\s+(-?\d+(\.\d+)?)/) ||
-    #             line.match(/(\S+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(\S+)/)||
-    #             line.match(/(\S+)\s*(-?\d+(\.\d+)?)\s*(-?\d+(\.\d+)?)\s*(-?\d+(\.\d+)?)\s*(-?\d+(\.\d+)?)/)
-    
-    #     if match
-    #       Rails.logger.debug "dhukce" 
-    #       word = match[1]
-    #       left_top_x = match[2].to_i
-    #       left_top_y = match[3].to_i
-    #       right_bottom_x = match[4].to_i
-    #       right_bottom_y = match[5].to_i
-    
-    #       # Calculate width and height from coordinates
-    #       width = right_bottom_x - left_top_x
-    #       height = right_bottom_y - left_top_y
-    #       Rails.logger.debug "OCR linewidth: #{width}" # Debugging statement
-    #       words_and_coordinates << { text: word, coordinates: { x: left_top_x, y: left_top_y, width: width, height: height } }
-    #     end
-    #   end
-    
-    #   return words_and_coordinates
-    # end
-
-    
-    
-    
     def perform_ocr_with_coordinates_single_image(image_data)
       # Perform OCR and extract words and coordinates
       words_and_coordinates = perform_ocr(image_data)
@@ -631,6 +588,36 @@ class PdfGenerationController < ApplicationController
       end
 
       return { text: ocr_text.strip, coordinates: ocr_coordinates }
+    end
+
+        
+    def add_ocr_text(pdf, image_data)
+      # Create a temporary file to store the image data
+      Tempfile.create(['image', '.png']) do |tempfile|
+        tempfile.binmode
+        tempfile.write(image_data)
+        tempfile.rewind
+    
+        # Create an RTesseract OCR object
+        ocr = RTesseract.new(tempfile.path, processor: 'mini_magick')
+    
+        # Get recognized text
+        text = ocr.to_s.strip
+    
+        # Check if the recognized text is not empty
+        if text.present?
+          # Use the text_positions method to obtain line-level bounding boxes
+          text_positions = ocr.text_positions
+    
+          # Iterate through each line and add to the PDF with coordinates
+          text_positions.each do |line|
+            line_x, line_y, line_width, line_height = line.left, line.top, line.width, line.height
+            pdf.text_box line.text, at: [line_x.to_f, pdf.bounds.height - line_y.to_f - line_height.to_f], width: line_width.to_f, height: line_height.to_f
+          end
+        else
+          Rails.logger.error "Error: OCR processing did not recognize any text."
+        end
+      end
     end
    
   end
