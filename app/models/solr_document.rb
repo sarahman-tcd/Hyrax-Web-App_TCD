@@ -202,4 +202,8 @@ class SolrDocument
   def physical_extent
     self[Solrizer.solr_name('physical_extent')]
   end
+
+  def digest_sha1
+    self['digest_ssim']&.first&.[](/urn:sha1:([\w]+)/, 1)
+  end
 end
