@@ -4,6 +4,9 @@ Rails.application.routes.draw do
 
   get 'pdf_generation/check_pdf_file_exists/:file_set_id', to: 'pdf_generation#check_pdf_file_exists'
   
+  post 'catalog/save_tile_order', to: 'catalog#save_tile_order'
+  get 'catalog/get_title_orders', to: 'catalog#get_title_orders'
+  
   # get 'pdf_generation/solrdata', to: 'pdf_generation#solrdata'
 
   #get 'image_display_names/new'

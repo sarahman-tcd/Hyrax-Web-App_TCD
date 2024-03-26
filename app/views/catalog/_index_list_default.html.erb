@@ -21,6 +21,89 @@
     <div class="collection-counts-item">
       <span><%= collection_presenter.total_viewable_works %></span>Works
     </div>
+    
+    <div class="collection-counts-item tileOrderContainer">    
+        <span class="addText" id="<%= doc_presenter.field_value('id').parameterize %>" style="display:inline-block;">Add</span>
+        <input type="text" class="text-box" style="display: none; width: 25px;">
+        <br>
+        Tile Order 
+    </div> 
+
   </div>
 </div>
 <% end %>
+
+
+<script> 
+  $(document).on('click', '.tileOrderContainer', function(event) {
+      if ($(event.target).hasClass('addText')) {
+          const addText = $(event.target);
+          const clickedId = addText.attr('id'); 
+          console.log('Clicked item ID:', clickedId);
+          
+          const textBox = addText.next('input'); 
+          textBox.attr('id', 'tileOrderTextBox'); 
+
+          addText.hide();
+          textBox.css('display', 'inline-block'); 
+          textBox.focus();
+      }
+  });
+
+ 
+  $('.tileOrderContainer').one('blur', '#tileOrderTextBox', function() {
+    const textBox = $(this);
+    const addText = textBox.prev('.addText'); 
+
+    if (textBox.val().trim() === '') {
+      addText.text('Add');
+    } else {
+      const addTextId = addText.attr('id'); 
+      const textboxValue = textBox.val(); 
+      addText.text(textboxValue);
+     
+      $.ajax({
+        url: '/catalog/save_tile_order', 
+        method: 'POST',
+        data: {
+          addTextId: addTextId,
+          textboxValue: textboxValue
+        },
+        success: function(response) {
+          console.log('AJAX request successful:', response);
+          alert('Saved successfully');
+        },
+        error: function(xhr, status, error) {
+          console.error('AJAX request failed:', error);
+          alert('Error: ' + xhr.responseJSON.error);
+        }
+      });
+    }
+
+    textBox.css('display', 'none');
+    addText.css('display', 'inline-block');
+  });
+</script>
+<script>
+  $(document).ready(function() {
+    function fetchData() {
+      $.ajax({
+        url: '/catalog/get_title_orders', 
+        method: 'GET',
+        success: function(data) {
+          data.forEach(function(item) {
+            var addText = $('.addText#' + item.collection_id);
+            if (addText.length > 0) { 
+              addText.text(item.tile_order);
+            }
+          });
+        },
+        error: function(xhr, status, error) {
+          console.error('Failed to fetch data:', error);
+        }
+      });
+    }
+
+    fetchData();
+  });
+</script>

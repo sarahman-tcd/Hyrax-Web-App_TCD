@@ -1,3 +1,5 @@
+require 'json'
+
 class Hyrax::HomepageController < ApplicationController
   # Adds Hydra behaviors into the application controller
   include Blacklight::SearchContext
@@ -35,6 +37,32 @@ class Hyrax::HomepageController < ApplicationController
     rescue Blacklight::Exceptions::ECONNREFUSED, Blacklight::Exceptions::InvalidRequest
       []
     end
+
+    # def collections(rows: 18)
+    #   builder = Hyrax::CollectionSearchBuilder.new(self)
+    #                                            .rows(rows)
+    #   response = repository.search(builder)
+    #   response.documents
+    
+    #   # # Read JSON file and parse its content
+    #   # file_path = Rails.root.join('public', 'tileOrder.json')
+    #   # tile_order_data = JSON.parse(File.read(file_path))
+
+    #   # # Create a hash to store tile order based on collection ID
+    #   # tile_order_hash = {}
+    #   # tile_order_data.each { |item| tile_order_hash[item['collection_id']] = item['tile_order'].to_i }
+    
+    #   # # Sort collections based on tile order specified in JSON
+    #   # # collections = collection.sort_by { |collection| tile_order_hash[collection['id']] || Float::INFINITY }
+
+    #   # collections
+    #   # Rails.logger.debug "DHUKCHE"
+    #   # Rails.logger.debug collections.first.to_json
+    #   # Rails.logger.debug "sesh"
+    # rescue Blacklight::Exceptions::ECONNREFUSED, Blacklight::Exceptions::InvalidRequest
+    #   []
+    # end
+
 
     def recent
       # grab any recent documents
