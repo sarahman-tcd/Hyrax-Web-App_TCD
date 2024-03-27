@@ -59,3 +59,16 @@ Things you may want to cover:
 * ...
 
 * ... etc
+
+
+### IIIF URL configuration
+
+If you set `EXTERNAL_IIIF_URL` in your environment, then IiifPrint will use that URL as the root for your IIIF URLs. It will also switch from using the file set ID to using the SHA1 of the file as the identifier. This enables using serverless_iiif or Cantaloupe (refered to as the service) by pointing the service to the same S3 bucket that FCREPO writes the uploaded files to. By setting it up that way you do not need the service to connect to FCREPO or Hyrax at all, both natively support connecting to an S3 bucket to get their data.
+
+For Trinity production to use cataloupe in a similar way, set the `EXTERNAL_IIIF_URL` to https://digitalcollections.tcd.ie/iiif/2
+
+Cantaloupe property changes:
+
+delegate_script.enabled = false
+source.static = FilesystemSource
+FilesystemSource.BasicLookupStrategy.path_prefix = /digicolapp/repository/fedora01/fcrepo.binary.directory
