@@ -29,20 +29,45 @@ class Hyrax::HomepageController < ApplicationController
   private
 
     # Return 10 collections
+    # def collections(rows: 18)
+    #   builder = Hyrax::CollectionSearchBuilder.new(self)
+    #                                           .rows(rows)
+    #   response = repository.search(builder)
+    #   response.documents
+    # rescue Blacklight::Exceptions::ECONNREFUSED, Blacklight::Exceptions::InvalidRequest
+    #   []
+    # end
+
     def collections(rows: 18)
       builder = Hyrax::CollectionSearchBuilder.new(self)
                                               .rows(rows)
       response = repository.search(builder)
-      response.documents
+      collection_response=response.documents
+
+      # Read JSON file and parse its content
+      file_path = Rails.root.join('public', 'tileOrder.json')
+      tile_order_data = JSON.parse(File.read(file_path))
+
+      # Create a hash to store tile order based on collection ID
+      tile_order_hash = {}
+      tile_order_data.each { |item| tile_order_hash[item['collection_id']] = item['tile_order'].to_i }
+    
+      # Sort collections based on tile order specified in JSON
+      # sorted_collection = collection_response.sort_by { |collection| tile_order_hash[collection['id']] || Float::INFINITY }
+      
+      sorted_collection = collection_response.select { |collection| tile_order_hash.key?(collection['id']) }
+                                         .sort_by { |collection| tile_order_hash[collection['id']] }
+
+
+      sorted_collection
     rescue Blacklight::Exceptions::ECONNREFUSED, Blacklight::Exceptions::InvalidRequest
       []
     end
-
     # def collections(rows: 18)
     #   builder = Hyrax::CollectionSearchBuilder.new(self)
     #                                            .rows(rows)
     #   response = repository.search(builder)
-    #   response.documents
+    #   # collection_response=response.documents
     
     #   # # Read JSON file and parse its content
     #   # file_path = Rails.root.join('public', 'tileOrder.json')
@@ -53,11 +78,11 @@ class Hyrax::HomepageController < ApplicationController
     #   # tile_order_data.each { |item| tile_order_hash[item['collection_id']] = item['tile_order'].to_i }
     
     #   # # Sort collections based on tile order specified in JSON
-    #   # # collections = collection.sort_by { |collection| tile_order_hash[collection['id']] || Float::INFINITY }
+    #   # sorted_collection = collection_response.sort_by { |collection| tile_order_hash[collection['id']] || Float::INFINITY }
 
-    #   # collections
-    #   # Rails.logger.debug "DHUKCHE"
-    #   # Rails.logger.debug collections.first.to_json
+    #   response.documents
+    #   # Rails.logger.debug "chupthak"
+    #   # # Rails.logger.debug response.documents.first.to_json
     #   # Rails.logger.debug "sesh"
     # rescue Blacklight::Exceptions::ECONNREFUSED, Blacklight::Exceptions::InvalidRequest
     #   []

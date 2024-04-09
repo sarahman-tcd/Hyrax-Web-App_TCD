@@ -1,0 +1,89 @@
+<div id="content" class="col-md-9 col-md-push-3 col-sm-8 col-sm-push-4">
+    <%= render 'search_results' %>
+</div>
+
+<div id="sidebar" class="col-md-3 col-md-pull-9 col-sm-4 col-sm-pull-8">
+  <%= render 'search_sidebar' %>
+</div>
+
+
+
+<script> 
+  $(document).on('click', '.tileOrderContainer', function(event) {
+      if ($(event.target).hasClass('addText')) {
+          const addText = $(event.target);
+          const clickedId = addText.attr('id'); 
+          console.log('Clicked item ID:', clickedId);
+          
+          const textBox = addText.next('input'); 
+          textBox.attr('id', 'tileOrderTextBox'); 
+
+          addText.hide();
+          textBox.css('display', 'inline-block'); 
+          textBox.focus();
+      }
+  });
+
+ 
+  $('.tileOrderContainer').on('blur', '#tileOrderTextBox', function() {
+    const textBox = $(this);
+    const addText = textBox.prev('.addText'); 
+
+    
+      const addTextId = addText.attr('id'); 
+      const textboxValue = textBox.val(); 
+     
+      $.ajax({
+        url: '/catalog/save_tile_order', 
+        method: 'POST',
+        data: {
+          addTextId: addTextId,
+          textboxValue: textboxValue
+        },
+        success: function(response) {
+          console.log('AJAX request successful:', response);
+          if(textboxValue!=''){
+            alert('Saved successfully');
+          }
+        },
+        error: function(xhr, status, error) {
+          console.error('AJAX request failed:', error);
+          alert('Sorry, ' + xhr.responseJSON.error);
+        }
+      });
+    
+
+    textBox.css('display', 'none');
+    addText.css('display', 'inline-block');
+    
+    fetchData();
+  });
+</script>
+<script>
+  function fetchData() {
+    $.ajax({
+      url: '/catalog/get_title_orders', 
+      method: 'GET',
+      success: function(data) {
+        data.forEach(function(item) {
+          var addText = $('.addText#' + item.collection_id);
+          addText.text(''); 
+          if (addText.length > 0) { 
+            if (item.tile_order=='00'||item.tile_order==''){
+              addText.text('Add');
+            }
+            else{             
+              addText.text(item.tile_order);
+            }
+          }
+        });
+      },
+      error: function(xhr, status, error) {
+        console.error('Failed to fetch data:', error);
+      }
+    });
+  }
+  $(document).ready(function() {
+    fetchData();
+  });
+</script>

@@ -1,7 +1,7 @@
 class CatalogController < ApplicationController
   include Hydra::Catalog
   include Hydra::Controller::ControllerBehavior
-  protect_from_forgery with: :null_session
+  # protect_from_forgery with: :null_session
 
   # This filter applies the hydra access controls
   before_action :enforce_show_permissions, only: :show
@@ -24,14 +24,17 @@ class CatalogController < ApplicationController
   end
 
   def save_tile_order
-    Rails.logger.debug "version 1.0 initiated..."
     collection_id = params[:addTextId]
     tile_order = params[:textboxValue]
-
-    if tile_order.blank?
+   
+    if tile_order.blank? || tile_order.to_s.strip == ''
       tile_order = '00'
-    elsif tile_order != '00' && !valid_value?(tile_order)
-      message = 'Tile order should be between 01 and 18 and numeric'
+    elsif !valid_value?(tile_order)
+      message = 'the tile order should be between 01 and 18 and numeric'
+      render json: { error: message }, status: :unprocessable_entity
+      return
+    elsif tile_order != '00' && tile_order.to_i < 1 || tile_order.to_i > 18
+      message = 'the tile order should be between 01 and 18'
       render json: { error: message }, status: :unprocessable_entity
       return
     end
@@ -40,6 +43,12 @@ class CatalogController < ApplicationController
     existing_data = read_existing_data
 
     if existing_data.any? { |data| data['collection_id'] == collection_id }
+      # Check if tile order already exists for another collection
+      if existing_data.any? { |data| data['tile_order'] == tile_order && data['collection_id'] != collection_id&& tile_order != '00' }
+        message = 'the tile order already exists for another collection'
+        render json: { error: message }, status: :unprocessable_entity
+        return
+      end
       # Update the tile_order if the collection_id already exists
       existing_data.each do |data|
         if data['collection_id'] == collection_id
