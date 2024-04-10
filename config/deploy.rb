@@ -2,7 +2,7 @@
 lock "~> 3.12.0"
 
 set :application, "TCD-Hyrax-Web-App"
-set :repo_url, "https://github.com/joelakes/TCD-Hyrax-Web-App.git"
+set :repo_url, "https://github.com/sarahman-tcd/Hyrax-Web-App_TCD.git"
 #set :rvm_ruby_version, '2.5.1'
 
 # JL : see notes when installing capistrano 21/03/2019

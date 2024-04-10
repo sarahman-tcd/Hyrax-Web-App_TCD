@@ -142,10 +142,4 @@ gem 'prawn'
 
 gem 'mini_magick'
 
-gem 'rtesseract'
-
-gem 'pdf-forms'
-
-gem 'pdf-reader'
-
-gem 'pdfkit'
+gem 'rest-client'
