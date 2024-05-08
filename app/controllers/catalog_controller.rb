@@ -1,6 +1,7 @@
 class CatalogController < ApplicationController
   include Hydra::Catalog
   include Hydra::Controller::ControllerBehavior
+  protect_from_forgery with: :null_session
 
   # This filter applies the hydra access controls
   before_action :enforce_show_permissions, only: :show
@@ -12,6 +13,80 @@ class CatalogController < ApplicationController
   def self.modified_field
     solr_name('system_modified', :stored_sortable, type: :date)
   end
+ 
+  def get_title_orderstest
+    Rails.logger.debug "version 2.0 initiated...initialliezed"
+    @data = read_existing_data
+    Rails.logger.debug @data
+    respond_to do |format|
+      format.json { render json: @data }
+    end
+  end
+
+  def save_tile_order
+    collection_id = params[:addTextId]
+    tile_order = params[:textboxValue]
+   
+    if tile_order.blank? || tile_order.to_s.strip == ''
+      tile_order = '00'
+    elsif !valid_value?(tile_order)
+      message = 'the tile order should be between 01 and 18 and numeric'
+      render json: { error: message }, status: :unprocessable_entity
+      return
+    elsif tile_order != '00' && tile_order.to_i < 1 || tile_order.to_i > 18
+      message = 'the tile order should be between 01 and 18'
+      render json: { error: message }, status: :unprocessable_entity
+      return
+    end
+
+    # Read existing collection_id from the file
+    existing_data = read_existing_data
+
+    if existing_data.any? { |data| data['collection_id'] == collection_id }
+      # Check if tile order already exists for another collection
+      if existing_data.any? { |data| data['tile_order'] == tile_order && data['collection_id'] != collection_id&& tile_order != '00' }
+        message = 'the tile order already exists for another collection'
+        render json: { error: message }, status: :unprocessable_entity
+        return
+      end
+      # Update the tile_order if the collection_id already exists
+      existing_data.each do |data|
+        if data['collection_id'] == collection_id
+          data['tile_order'] = tile_order
+          break
+        end
+      end
+    else
+      # Add new data if the collection_id does not exist
+      existing_data << { 'collection_id' => collection_id, 'tile_order' => tile_order }
+    end
+
+    write_data(existing_data)
+    
+    render json: { message: 'Saved successfully' }
+  rescue => e
+    # If any error occurs during the process, respond with an error message
+    Rails.logger.error "Error: #{e.message}, Raised at: #{backtrace}"
+    render json: { error: e.message }, status: :unprocessable_entity
+  end
+
+  private
+
+  def read_existing_data
+    file_path = Rails.root.join('public', 'tileOrder.json')
+    File.exist?(file_path) ? JSON.parse(File.read(file_path)) : []
+  end
+
+  def write_data(data)
+    file_path = Rails.root.join('public', 'tileOrder.json')
+    File.open(file_path, 'w') { |file| file.write(JSON.generate(data)) }
+  end
+
+  def valid_value?(value)
+    value.match?(/\A\d{2}\z/) && value.to_i.between?(1, 18)
+  end
+
+
 
   configure_blacklight do |config|
     #config.view.gallery.partials = [:index_header, :index]

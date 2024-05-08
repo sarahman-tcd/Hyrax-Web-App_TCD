@@ -141,3 +141,5 @@ gem 'combine_pdf'
 gem 'prawn'
 
 gem 'mini_magick'
+
+gem 'rest-client'

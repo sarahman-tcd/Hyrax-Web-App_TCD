@@ -21,6 +21,18 @@
     <div class="collection-counts-item">
       <span><%= collection_presenter.total_viewable_works %></span>Works
     </div>
+
+    <% if user_signed_in?%>
+    <div class="collection-counts-item tileOrderContainer">            
+        <span class="addText" id="<%= doc_presenter.field_value('id').parameterize %>" style="display:inline-block;">Add</span>
+        <input type="text" class="text-box" style="display: none; width: 25px;">
+        <br>
+        Tile Order 
+    </div> 
+    <% end %>
+
+
   </div>
 </div>
 <% end %>
+
