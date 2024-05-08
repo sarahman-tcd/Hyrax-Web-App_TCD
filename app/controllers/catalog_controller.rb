@@ -14,7 +14,7 @@ class CatalogController < ApplicationController
     solr_name('system_modified', :stored_sortable, type: :date)
   end
  
-  def get_title_orderstest
+  def get_title_orders
     Rails.logger.debug "version 2.0 initiated...initialliezed"
     @data = read_existing_data
     Rails.logger.debug @data
