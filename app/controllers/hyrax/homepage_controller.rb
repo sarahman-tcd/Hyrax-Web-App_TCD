@@ -38,7 +38,7 @@ class Hyrax::HomepageController < ApplicationController
     #   []
     # end
 
-    def collections(rows: 18)
+    def collections(rows: 20)
       builder = Hyrax::CollectionSearchBuilder.new(self)
                                               .rows(rows)
       response = repository.search(builder)
