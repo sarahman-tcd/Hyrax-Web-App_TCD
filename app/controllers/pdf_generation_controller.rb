@@ -5,6 +5,7 @@ require 'combine_pdf'
 require 'prawn'
 require 'mini_magick'
 require 'rest-client'
+require 'fileutils'
 
 class PdfGenerationController < ApplicationController    
     Encoding.default_external = Encoding::UTF_8
@@ -12,26 +13,41 @@ class PdfGenerationController < ApplicationController
     
     def pdf   
       begin   
-        Rails.logger.debug "version 7.0.5 initiated..."
+        Rails.logger.debug "version 8.0.0 initiated..."
         work_id = params[:file_set_id]         
         ocr_checkbox_val = params[:ocr_checkbox]  
         
+        # UNCOMMENT THIS- After solving folder number issues
         # Update the pdf file every time - logged in user
-        delete_file(work_id) if user_signed_in?
+        # delete_file(work_id) if user_signed_in?
 
         # Check if the PDF file already exists - for end user        
         existing_pdf_path = "/digicolapp/datastore/pdf/#{work_id}.pdf"
-        if File.exist?(existing_pdf_path)
+
+        if File.exist?(existing_pdf_path) 
           Rails.logger.debug "PDF already exists. Sending existing PDF."
 
-          # Send the existing PDF as a download to the user
-          send_file existing_pdf_path, filename: "#{work_id}.pdf", type: 'application/pdf', disposition: 'inline'
-          return
+          if ocr_checkbox_val.to_s == "true"
+            # This- Delete next two line when folder no. issue is resolved
+            ocr_language = params[:ocr_language] || 'eng'
+            ocr_and_download_searchable_pdf(existing_pdf_path, ocr_language)
+            # UNCOMMENT THIS- After solving folder number issues
+            # send_file existing_pdf_path, filename: "#{work_id}_OCR_Enabled.pdf", type: 'application/pdf', disposition: 'inline'
+          else  
+            # Send the existing PDF as a download to the user
+            send_file existing_pdf_path, filename: "#{work_id}.pdf", type: 'application/pdf', disposition: 'inline'
+            return
+          end
         end
 
         # Change the url for LIVE
         dev = 'http://dcdev-solr.tcd.ie:8983/solr/tcd-hyrax/'
         primary = 'http://digcoll-solr01.tcd.ie:8983/solr/tcd-hyrax/'
+
+        # This- Comment/delete
+        secondary = 'http://digcoll-solr02.tcd.ie:8983/solr/tcd-hyrax/'
+
+        # This- Replace secondary to primary 
         $solr = RSolr.connect(url: dev) 
         work_response = $solr.get('select', params: { q: "id:#{work_id}" })
         work_data = work_response['response']['docs'][0]        
@@ -46,12 +62,12 @@ class PdfGenerationController < ApplicationController
         # Check if contributor is present, is an array, and not emptyocr_checkbox_val
         contributor = work_data['contributor_tesim'].present? && work_data['contributor_tesim'].is_a?(Array) && !work_data['contributor_tesim'].empty? ? work_data['contributor_tesim'] : ['Not specified']
           
-        folder_numbers = work_data['folder_number_tesim'].first
+        folder_numbers = work_data['folder_number_tesim']
         file_set_ids = work_data['file_set_ids_ssim']
         
         if folder_numbers.present? && file_set_ids.present?
           image_names = []
-    
+          folder_numbers = work_data['folder_number_tesim'].first
           file_set_ids.each do |file_set_id|
             # Construct a Solr query to fetch the label_ssi for the given file_set_id
             query = "id:#{file_set_id}"
@@ -180,7 +196,6 @@ class PdfGenerationController < ApplicationController
           ocr_language = params[:ocr_language] || 'eng'
           ocr_and_download_searchable_pdf(pdf_path, ocr_language)
         else    
-          # Send the existing PDF file to the user
           send_file pdf_path, filename: pdf_filename, type: 'application/pdf', disposition: 'inline'
         end  
       rescue => e
@@ -289,40 +304,109 @@ class PdfGenerationController < ApplicationController
       end
     end
 
-    def ocr_and_download_searchable_pdf (pdf_path, ocr_language)  
+    def ocr_and_download_searchable_pdf(pdf_path, ocr_language)
+      file_set_id = params[:file_set_id]
+      public_pdf_path = Rails.root.join('public', "#{file_set_id}.pdf")
+    
+      # Copy the PDF file to the public folder
+      FileUtils.cp(pdf_path, public_pdf_path)
+    
       # Perform OCR using OCR Space API
-      ocr_response = perform_ocr(pdf_path,ocr_language)
-  
+      ocr_response = perform_ocr(file_set_id, ocr_language)
+    
       if ocr_response['SearchablePDFURL'].present?
         searchable_pdf_url = ocr_response['SearchablePDFURL']
+        Rails.logger.debug "searchable_pdf_url #{searchable_pdf_url}"
         # Download the searchable PDF
         downloaded_pdf_path = download_searchable_pdf(searchable_pdf_url, pdf_path)
-  
+    
+        File.delete(public_pdf_path) if File.exist?(public_pdf_path) 
+    
         # Send the downloadable PDF to the user
+        pdf_filename = "#{file_set_id}_OCR_Enabled.pdf" #File.basename(downloaded_pdf_path)
+        Rails.logger.debug "pdf_filename #{pdf_filename}"
+        Rails.logger.debug "downloaded_pdf_path #{downloaded_pdf_path}"
         send_file downloaded_pdf_path, filename: pdf_filename, type: 'application/pdf', disposition: 'inline'
       else
-        render plain: 'OCR failed or no searchable PDF found.'
+        
+        File.delete(public_pdf_path) if File.exist?(public_pdf_path)
+    
+        Rails.logger.debug "OCR failed or no searchable PDF found."
       end
     end
 
-    def perform_ocr(pdf_path, ocr_language)
-      response = RestClient.post(OCR_SPACE_API_URL,
-                                 apikey: 'DPD8EXN57323X',
-                                 language: ocr_language,
-                                 file: File.new(pdf_path),
-                                 isCreateSearchablePdf: true,
-                                 isSearchablePdfHideTextLayer: true)
+    # def perform_ocr(file_set_id, ocr_language)
+    #   # pdf_url="https://digitalcollections.tcd.ie/#{file_set_id}.pdf"      
+         
+    #    # Delete the next one line once in live- THIS
+    #   pdf_url="https://digitalcollections.tcd.ie/temp.pdf"
+
+    #   Rails.logger.debug " path_pdf: #{pdf_url}"   
+
+    #   filetype="PDF"
+    #   response = RestClient::Request.execute(method: :post, url: OCR_SPACE_API_URL, payload: {
+    #                               apikey: 'DPD8EXN57323X',
+    #                               language: ocr_language,
+    #                               url: pdf_url,
+    #                               filetype: filetype,
+    #                               isCreateSearchablePdf: true,
+    #                               isSearchablePdfHideTextLayer: true,
+    #                               OCREngine: "2"
+    #                             },
+    #                             headers: {
+    #                               content_type: 'application/pdf'
+    #                             })
+                               
+    #   Rails.logger.debug "response: #{response.body}"
+    #   JSON.parse(response.body)
+    # end
+
+    def perform_ocr(file_set_id, ocr_language)
+    #   # pdf_url="https://digitalcollections.tcd.ie/#{file_set_id}.pdf"      
+         
+    #    # Delete the next one line once in live- THIS
+      pdf_url="https://digitalcollections.tcd.ie/temp.pdf"
+
+      ocr_response = request_ocr(pdf_url, ocr_language, '2')
   
+      # Retry with OCREngine=1 if there is an error
+      if ocr_response['IsErroredOnProcessing']
+        ocr_response = request_ocr(pdf_url, ocr_language, '1')
+      end
+  
+      ocr_response
+    end
+  
+    def request_ocr(pdf_url, language, ocr_engine)
+      uri = URI.parse(OCR_SPACE_API_URL)
+      request = Net::HTTP::Post.new(uri)
+      
+      form_data = {
+        'apikey' => API_KEY,
+        'language' => language,
+        'isCreateSearchablePdf' => 'true',
+        'isSearchablePdfHideTextLayer' => 'true',
+        'OCREngine' => ocr_engine,
+        'url' => pdf_url,
+        'scale' => 'true',
+        'filetype' => 'PDF'
+      }
+  
+      request.set_form_data(form_data)
+  
+      response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) do |http|
+        http.request(request)
+      end
+      Rails.logger.debug "response: #{response.body}"
       JSON.parse(response.body)
     end
   
     def download_searchable_pdf(url, original_pdf_path)
-      downloaded_pdf_path = original_pdf_path.sub(/\.pdf$/, '_searchable.pdf')
-  
-      File.open(downloaded_pdf_path, 'wb') do |file|
+      # downloaded_pdf_path = original_pdf_path.sub(/\.pdf$/, '.pdf')
+      File.open(original_pdf_path, 'wb') do |file|
         file.write RestClient.get(url).body
       end
   
-      downloaded_pdf_path
+      original_pdf_path
     end
   end
