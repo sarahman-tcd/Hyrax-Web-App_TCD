@@ -1,3 +1,20 @@
+<style>
+.grouped-inputs {
+  border: 1px solid #ccc;
+  padding: 10px;
+  margin-top: 10px;
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+.form-control {
+  display: inline-block;
+  width: 100%;
+}
+
+</style>
 
 <% page_title ||= content_for?(:page_title) ? content_for(:page_title) : default_page_title %>
 <% share_url ||= request.original_url %>
@@ -59,8 +76,32 @@
 
     <input type="checkbox" id="ocrCheckbox" class="visibleToAdminOnly" />
     <label class="visibleToAdminOnly" for="ocrCheckbox" style= "margin-bottom: 10px; font-weight: 0;">Enable OCR</label>
+    
+    <div id="dropdownContainer" class="grouped-inputs" style="display: none;">
+      <div class="form-group row">
+        <label class="col-md-4 col-form-label" for="languageSelect">Language</label>
+        <div class="col-md-8">
+          <%= select_tag :language, options_for_select([['Deutsch', 'ger'], ['English', 'eng'], ['Español', 'spa'], ['Français', 'fre'], ['Italiano', 'ita'], ['Português', 'por'], ['中文', 'chs']], selected: 'eng'), class: 'form-control visibleToAdminOnly', id: 'languageSelect' %>
+        </div>
+      </div>
 
-    <a id="downloadButton" class="authBaseVisibility" href="<%= main_app.pdf_path(ocr_checkbox: 'false', file_set_id: file_set_id) %>" target="_blank">
+      <div class="form-group row">
+        <label class="col-md-4 col-form-label" for="engineSelect">Engine</label>
+        <div class="col-md-8">
+          <%= select_tag :ocr_engine, options_for_select([['1', 1], ['2', 2], ['3', 3]], selected: '2'), class: 'form-control', id: 'engineSelect' %>
+        </div>
+      </div>
+
+      <div class="form-group row">      
+        <label class="col-md-4 col-form-label" for="sourceFile">Source</label>
+        <div class="col-md-6">
+          <%= radio_button_tag :pdf_source, 'file', false, class: '', id: 'sourceFile' %> File
+          <%= radio_button_tag :pdf_source, 'url', true, class: '', id: 'sourceUrl' %> URL
+        </div>
+      </div>
+    </div>
+
+    <a id="downloadButton" class="authBaseVisibility" href="<%= main_app.pdf_path(ocr_checkbox: 'false', language:'eng', engine:'2', source:'url' , file_set_id: file_set_id) %>" target="_blank">
         <br />
         Download PDF
         <br />
@@ -155,15 +196,58 @@ function userIsSignedIn() {
 
 
 <script>
-document.getElementById('ocrCheckbox').addEventListener('change', function() {
-    var isChecked = this.checked;
+  document.addEventListener("DOMContentLoaded", function() {
+   
+      
     var downloadButton = document.getElementById('downloadButton');
-    
-    if (isChecked) {
-        downloadButton.href = '<%= main_app.pdf_path(ocr_checkbox: 'true', file_set_id: file_set_id) %>';
+    downloadButton.addEventListener('click', function(event) {
+      var ocrCheckboxE = document.getElementById('ocrCheckbox');
+      var isChecked = ocrCheckboxE.checked;
+      var languageSelect = document.getElementById('languageSelect');
+      var engineSelect = document.getElementById('engineSelect');
+      var sourceFile = document.getElementById('sourceFile');
+      var sourceUrl = document.getElementById('sourceUrl');
+
+      if (languageSelect && engineSelect && (sourceFile || sourceUrl)) {
+        var language = languageSelect.value;
+        var engine = engineSelect.value;
+        var source = sourceFile.checked ? sourceFile.value : sourceUrl.value;
+
+        var ocr_checkbox = isChecked ? 'true' : 'false';
+        var file_set_id = '<%= file_set_id %>'; 
+
+        console.log(language);
+        console.log(engine);
+        console.log(source);
+        console.log(ocr_checkbox);
+        console.log(file_set_id);
+
+        var url = '<%= main_app.pdf_path(ocr_checkbox: "__OCR_CHECKBOX__", language: "__LANGUAGE__", engine: "__ENGINE__", source: "__SOURCE__", file_set_id: "__FILE_SET_ID__") %>'
+        .replace('__OCR_CHECKBOX__', encodeURIComponent(ocr_checkbox))        
+        .replace('__LANGUAGE__', encodeURIComponent(language))
+        .replace('__ENGINE__', encodeURIComponent(engine))
+        .replace('__SOURCE__', encodeURIComponent(source))
+        .replace('__FILE_SET_ID__', encodeURIComponent(file_set_id));
+
+        downloadButton.href = url;
+      }
+    });
+  });
+
+</script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  var checkbox = document.getElementById('ocrCheckbox');
+  var dropdownContainer = document.getElementById('dropdownContainer');
+
+  checkbox.addEventListener('change', function() {
+    if (checkbox.checked) {
+      dropdownContainer.style.display = 'block';
     } else {
-        downloadButton.href = '<%= main_app.pdf_path(ocr_checkbox: 'false', file_set_id: file_set_id) %>';
+      dropdownContainer.style.display = 'none';
     }
+  });
 });
 </script>
 

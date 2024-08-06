@@ -143,3 +143,7 @@ gem 'prawn'
 gem 'mini_magick'
 
 gem 'rest-client'
+
+gem 'rtesseract'
+
+gem 'multipart-post'
