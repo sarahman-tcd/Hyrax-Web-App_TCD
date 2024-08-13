@@ -13,6 +13,10 @@ class CatalogController < ApplicationController
   def self.modified_field
     solr_name('system_modified', :stored_sortable, type: :date)
   end
+
+  def self.identifier_first_field
+    solr_name('identifier_tesim', :stored_sortable, type: :string) # This assumes Solr can sort on the first value
+  end
  
   def get_title_orders
     Rails.logger.debug "version 2.0 initiated...initialliezed"
@@ -660,6 +664,9 @@ class CatalogController < ApplicationController
     config.add_sort_field "#{uploaded_field} asc", label: "date uploaded \u25B2"
     config.add_sort_field "#{modified_field} desc", label: "date modified \u25BC"
     config.add_sort_field "#{modified_field} asc", label: "date modified \u25B2"
+    config.add_sort_field "#{identifier_first_field} desc", label: "Shelf/Reference number \u25BC"
+    config.add_sort_field "#{identifier_first_field} asc", label: "Shelf/Reference number \u25B2"
+
 
     # If there are more than this many search results, no spelling ("did you
     # mean") suggestion is offered.
