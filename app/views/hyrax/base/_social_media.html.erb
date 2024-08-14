@@ -101,6 +101,16 @@
       </div>
     </div>
 
+
+    <a id="downloadTextButton" class="authBaseVisibility_pdf_text" href="<%= main_app.text_path( file_set_id: file_set_id) %>" target="_blank">
+        <br />
+        Download OCR Text
+        <br />
+        <span class="fa fa-file-text-o fa-3x" style="color:#6d6d6d"></span>
+        <br />  
+    </a>  
+
+    <hr class="dotted authBaseVisibility_pdf_text">  
     <a id="downloadButton" class="authBaseVisibility" href="<%= main_app.pdf_path(ocr_checkbox: 'false', language:'eng', engine:'2', source:'url' , file_set_id: file_set_id) %>" target="_blank">
         <br />
         Download PDF
@@ -192,6 +202,31 @@ $(document).ready(function() {
 function userIsSignedIn() {
   return userSignedIn === true;
 }
+</script>
+
+<script>
+$(document).ready(function() {
+  const fileSetIdMatch = window.location.href.match(/\/(works|folios|subseries)\/(\w+)/);
+  if (fileSetIdMatch) {
+    const fileSetId = fileSetIdMatch[2];
+    console.log (fileSetId);
+    $.ajax({
+      url: `/pdf_generation/pdf_text_file_exists/${fileSetId}`,
+      type: 'GET',
+      dataType: 'json',
+      success: function(data) {
+        const authBaseVisibility = $('.authBaseVisibility_pdf_text');
+        const visibleToAdminOnly = $('.visibleToAdminOnly');
+        
+        authBaseVisibility.toggle(data.text_file_exists);
+        visibleToAdminOnly.toggle(userIsSignedIn());
+      },
+      error: function(xhr, status, error) {
+        console.error('Error checking PDF text file existence:', error);
+      }
+    });
+  }
+});
 </script>
 
 

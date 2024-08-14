@@ -9,7 +9,7 @@ require 'fileutils'
 require 'rtesseract'
 require 'prawn/measurement_extensions'
 
- require 'net/http'
+require 'net/http'
 require 'uri'
 require 'json'
 require 'tempfile'
@@ -167,12 +167,31 @@ class PdfGenerationController < ApplicationController
         # Initialize a flag to check if any images have been added
         images_added = false
     
+        if ocr_checkbox_val.to_s == "true"
+          # Initialize text file handling
+          text_file_path = "/digicolapp/datastore/pdf/text/#{file_set_id}.txt"
+          File.open(text_file_path, 'w') {} # Create an empty text file
+        end
+
         paths.each do |url|
           # Get the image data
           image_data = URI.open(url).read
     
          # Resize and compress the image
           resized_image_data = resize_image(image_data)
+
+          if ocr_checkbox_val.to_s == "true"
+            # Save the resized image to a temporary file
+            temp_image_path = "/digicolapp/datastore/pdf/temp/#{File.basename(url)}"
+            File.open(temp_image_path, 'wb') { |f| f.write resized_image_data }
+
+            # Extract text from the image using rtesseract
+            ocr = RTesseract.new(temp_image_path)
+            ocr_text = ocr.to_s
+
+            # Write extracted text to the text file
+            File.open(text_file_path, 'a') { |f| f.puts ocr_text }
+          end
 
           # If images haven't been added yet, don't start a new page
           if images_added 
@@ -229,47 +248,78 @@ class PdfGenerationController < ApplicationController
         format.json { render json: { pdf_file_exists: @pdf_file_exists } }
       end
     end
+
+
+    def downloadPdfTextFile
+      file_set_id = params[:file_set_id]  
+      existing_text_path = "/digicolapp/datastore/pdf/text/#{file_set_id}.txt"
+
+      if File.exist?(existing_text_path) 
+          Rails.logger.debug "PDF text file already exists. Sending existing PDF text file."
+
+          # Send the existing PDF text file as a download to the user
+          send_file existing_text_path, filename: "#{file_set_id}.txt", type: 'application/text', disposition: 'inline'
+      end     
+    end
+    
+    # Check if pdf text file exists
+    def pdf_text_file_exists
+      file_set_id = params[:file_set_id]
+      @text_file_exists = File.exist?("/digicolapp/datastore/pdf/text/#{file_set_id}.txt")
+    
+      respond_to do |format|
+        format.json { render json: { text_file_exists: @text_file_exists } }
+      end
+    end
     
     
   
     private
   
-    def add_title_page(pdf, title, shelf_mark, doi, creator, contributor, date_created, logo_path)
+   def add_title_page(pdf, title, shelf_mark, doi, creator, contributor, date_created, logo_path)
+      # Add a UTF-8 compatible font family (Open Sans in this case)
+      pdf.font_families.update("OpenSans" => {
+        normal: "app/assets/fonts/OpenSans-Regular.ttf",
+        bold: "app/assets/fonts/OpenSans-Bold.ttf",
+        italic: "app/assets/fonts/OpenSans-RegularItalic.ttf"
+      })
+
+      # Use the Open Sans font
+      pdf.font "OpenSans"
 
       # Add your logo at the top left corner
       pdf.image logo_path, position: :left, width: 232, height: 62      
       pdf.move_down 22 # Adjust as needed
-    
+
       # Add the title
       pdf.font_size 14
-      pdf.text title, style: :bold, encoding: 'UTF-8'
+      pdf.text title, style: :bold
       pdf.move_down 10
-    
 
       pdf.font_size 12
       # Add Shelf Mark/Reference Number
-      pdf.text "Shelf Mark/Reference Number", style: :bold, encoding: 'UTF-8'
-      pdf.text "#{shelf_mark}", encoding: 'UTF-8'
+      pdf.text "Shelf Mark/Reference Number", style: :bold
+      pdf.text "#{shelf_mark}"
       pdf.move_down 10
-    
+
       # Add DOI
-      pdf.text "DOI", style: :bold, encoding: 'UTF-8'
-      pdf.text "#{doi}", encoding: 'UTF-8'
+      pdf.text "DOI", style: :bold
+      pdf.text "#{doi}"
       pdf.move_down 10
-    
+
       # Add Creator(s)
-      pdf.text "Creator", style: :bold, encoding: 'UTF-8'
-      creator.each { |c| pdf.text "#{c}", encoding: 'UTF-8' }
+      pdf.text "Creator", style: :bold
+      creator.each { |c| pdf.text "#{c}" }
       pdf.move_down 10
-    
+
       # Add Contributor(s)
-      pdf.text "Contributor", style: :bold, encoding: 'UTF-8'
-      contributor.each { |c| pdf.text "#{c}", encoding: 'UTF-8' }
+      pdf.text "Contributor", style: :bold
+      contributor.each { |c| pdf.text "#{c}" }
       pdf.move_down 10
-    
+
       # Add Date Created
-      pdf.text "Date", style: :bold, encoding: 'UTF-8'
-      pdf.text "#{date_created}", encoding: 'UTF-8'
+      pdf.text "Date", style: :bold
+      pdf.text "#{date_created}"
       pdf.move_down 10          
 
       # Add the fixed text at the bottom center
@@ -280,8 +330,8 @@ class PdfGenerationController < ApplicationController
                   width: pdf.bounds.width,
                   height: 30,
                   size: 8,
-                  align: :center,
-                  encoding: 'UTF-8')
+                  align: :center)
+                
     end
 
     def resize_image(image_data)
@@ -405,9 +455,7 @@ class PdfGenerationController < ApplicationController
       Rails.logger.debug "response: #{response.body}"
       JSON.parse(response.body)
     end
-  
- 
-  
+    
     def download_searchable_pdf(url, original_pdf_path)
       # downloaded_pdf_path = original_pdf_path.sub(/\.pdf$/, '.pdf')
       File.open(original_pdf_path, 'wb') do |file|
@@ -416,61 +464,4 @@ class PdfGenerationController < ApplicationController
       original_pdf_path
     end
 
-    # def convert_to_searchable_pdf
-    #   url = 'https://digitalcollections.tcd.ie/tt44pn209.pdf'
-    #   file_path = Rails.root.join('public', 'downloaded_file.pdf')
-  
-    #   # Step 1: Download the PDF
-    #   URI.open(url) do |file|
-    #     File.open(file_path, 'wb') do |pdf|
-    #       pdf.write(file.read)
-    #     end
-    #   end
-  
-    #   # Step 2: Extract Images from PDF
-    #   image_paths = extract_images_from_pdf(file_path)
-  
-    #   # Step 3: Perform OCR on Extracted Images
-    #   ocr_texts = image_paths.map do |image_path|
-    #     RTesseract.new(image_path, psm: 1).to_s
-    #   end
-  
-    #   # Step 4: Create a New PDF with the Original Images and Searchable Text Overlay
-    #   new_pdf_path = Rails.root.join('public', 'searchable_pdf.pdf')
-    #   create_searchable_pdf(image_paths, ocr_texts, new_pdf_path)
-  
-    #   render plain: "Searchable PDF created at #{new_pdf_path}"
-    # end
-  
-    # private
-  
-    # def extract_images_from_pdf(file_path)
-    #   image_paths = []
-    #   MiniMagick::Tool::Convert.new do |convert|
-    #     convert << file_path
-    #     convert << Rails.root.join('public', 'page_%d.png').to_s
-    #   end
-  
-    #   Dir[Rails.root.join('public', 'page_*.png')].sort.each do |path|
-    #     image_paths << path
-    #   end
-  
-    #   image_paths
-    # end
-  
-    # def create_searchable_pdf(image_paths, ocr_texts, output_path)
-    #   Prawn::Document.generate(output_path, margin: 0) do |pdf|
-    #     image_paths.each_with_index do |image_path, index|
-    #       pdf.start_new_page(layout: :portrait, size: [pdf.bounds.width, pdf.bounds.height])
-    #       pdf.image image_path, fit: [pdf.bounds.width, pdf.bounds.height]
-          
-    #       # Use a very small font size and set the opacity to make text almost invisible
-    #       pdf.font_size 1
-    #       pdf.fill_color "000000"
-    #       pdf.transparent(0.01) do
-    #         pdf.text_box ocr_texts[index], at: [0, pdf.cursor], width: pdf.bounds.width, height: pdf.bounds.height, overflow: :shrink_to_fit
-    #       end
-    #     end
-    #   end
-    # end
   end
