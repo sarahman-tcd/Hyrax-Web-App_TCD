@@ -44,16 +44,20 @@ Rails.application.routes.draw do
   end
 
   # For DC Dev - PDF generation is still under development
-  # get '/pdf/:ocr_checkbox/:file_set_id', to: 'pdf_generation#pdf', as: 'pdf', constraints: AboutParamsConstraint.new
+  get '/pdf/:ocr_checkbox/:language/:engine/:source/:file_set_id', to: 'pdf_generation#pdf', as: 'pdf', constraints: AboutParamsConstraint.new
+  get '/downloadPdfTextFile/:file_set_id', to: 'pdf_generation#downloadPdfTextFile', as: 'text', constraints: AboutParamsConstraint.new
 
-  # get 'pdf_generation/check_pdf_file_exists/:file_set_id', to: 'pdf_generation#check_pdf_file_exists', constraints: AboutParamsConstraint.new
-  # End
-
-  #For Live
-  get '/pdf/:file_set_id', to: 'pdf_generation#pdf', as: 'pdf', constraints: AboutParamsConstraint.new
+  # get '/pdf', to: 'pdf_generation#pdf', as: 'pdf', constraints: AboutParamsConstraint.new
 
   get 'pdf_generation/check_pdf_file_exists/:file_set_id', to: 'pdf_generation#check_pdf_file_exists', constraints: AboutParamsConstraint.new
+  get 'pdf_generation/pdf_text_file_exists/:file_set_id', to: 'pdf_generation#pdf_text_file_exists', constraints: AboutParamsConstraint.new
   # End
+
+  # #For Live
+  # get '/pdf/:file_set_id', to: 'pdf_generation#pdf', as: 'pdf', constraints: AboutParamsConstraint.new
+
+  # get 'pdf_generation/check_pdf_file_exists/:file_set_id', to: 'pdf_generation#check_pdf_file_exists', constraints: AboutParamsConstraint.new
+  # # End
 
   constraints IIIFParamsConstraint.new do
     get '/iiif/2/*path', to: 'riiif/images#show', format: false

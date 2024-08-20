@@ -4,31 +4,56 @@ require 'open-uri'
 require 'combine_pdf'
 require 'prawn'
 require 'mini_magick'
+require 'rest-client'
+require 'fileutils'
+require 'rtesseract'
+require 'prawn/measurement_extensions'
+
+require 'net/http'
+require 'uri'
+require 'json'
+require 'tempfile'
+require 'net/http/post/multipart'
 
 class PdfGenerationController < ApplicationController    
     Encoding.default_external = Encoding::UTF_8
+    OCR_SPACE_API_URL = 'https://apipro2.ocr.space/parse/image'.freeze
+    API_KEY='DPD8EXN57323X'.freeze
     
     def pdf   
       begin   
-        Rails.logger.debug "version 7.0.5 initiated..."
+        Rails.logger.debug "version 9.0.0 initiated..."
         work_id = params[:file_set_id]         
+        ocr_checkbox_val = params[:ocr_checkbox]  
         
-        # Update the pdf file every time - logged in user
+        language = params[:language]
+        ocr_engine = params[:engine]
+        pdf_source = params[:source]
+        
+        # Update the pdf file every time - only for logged in user
         delete_file(work_id) if user_signed_in?
 
         # Check if the PDF file already exists - for end user        
         existing_pdf_path = "/digicolapp/datastore/pdf/#{work_id}.pdf"
-        if File.exist?(existing_pdf_path)
+
+        if File.exist?(existing_pdf_path) 
           Rails.logger.debug "PDF already exists. Sending existing PDF."
 
-          # Send the existing PDF as a download to the user
-          send_file existing_pdf_path, filename: "#{work_id}.pdf", type: 'application/pdf', disposition: 'inline'
-          return
+          if ocr_checkbox_val.to_s == "true"
+             send_file existing_pdf_path, filename: "#{work_id}_TextSearchable.pdf", type: 'application/pdf', disposition: 'inline'
+          else  
+            # Send the existing PDF as a download to the user
+            send_file existing_pdf_path, filename: "#{work_id}.pdf", type: 'application/pdf', disposition: 'inline'
+            return
+          end
         end
 
         # Change the url for LIVE
         dev = 'http://dcdev-solr.tcd.ie:8983/solr/tcd-hyrax/'
         primary = 'http://digcoll-solr01.tcd.ie:8983/solr/tcd-hyrax/'
+        secondary = 'http://digcoll-solr02.tcd.ie:8983/solr/tcd-hyrax/'
+
+        # This- Replace dev to primary 
         $solr = RSolr.connect(url: primary) 
         work_response = $solr.get('select', params: { q: "id:#{work_id}" })
         work_data = work_response['response']['docs'][0]        
@@ -38,17 +63,32 @@ class PdfGenerationController < ApplicationController
         shelf_mark = work_data['identifier_tesim'].present? ? work_data['identifier_tesim'].first : 'No shelf mark available'
         doi = work_data['doi_tesim'].present? ? work_data['doi_tesim'].first : 'No DOI available'
         date_created = work_data['date_created_tesim'].present? ? work_data['date_created_tesim'].first : 'No date created available'        
-        # Check if creator is present, is an array, and not empty
+         # Check if creator and contributor is present, is an array, and not empty
         creator = work_data['creator_tesim'].present? && work_data['creator_tesim'].is_a?(Array) && !work_data['creator_tesim'].empty? ? work_data['creator_tesim'] : ['Not specified']        
-        # Check if contributor is present, is an array, and not empty
         contributor = work_data['contributor_tesim'].present? && work_data['contributor_tesim'].is_a?(Array) && !work_data['contributor_tesim'].empty? ? work_data['contributor_tesim'] : ['Not specified']
           
-        folder_numbers = work_data['folder_number_tesim'].first
+        folder_numbers = work_data['folder_number_tesim']
         file_set_ids = work_data['file_set_ids_ssim']
+        flag=0
+                
+        if folder_numbers.blank? && file_set_ids.present?
+          Rails.logger.debug "folder_number_tesim #{folder_numbers}"
+          rn_file_set_id = work_data['file_set_ids_ssim'].first
+          query = "id:#{rn_file_set_id}"
+          rn_response = $solr.get('select', params: { q: query })
+          rn_file_set_data = rn_response['response']['docs'][0]
+          folder_numbers = rn_file_set_data['folder_number_tesim'].first
+          flag=1
+        end
         
         if folder_numbers.present? && file_set_ids.present?
           image_names = []
-    
+          if flag == 0
+            folder_numbers = work_data['folder_number_tesim'].first
+          elsif flag == 1
+            folder_numbers = folder_numbers
+          end
+          
           file_set_ids.each do |file_set_id|
             # Construct a Solr query to fetch the label_ssi for the given file_set_id
             query = "id:#{file_set_id}"
@@ -101,13 +141,18 @@ class PdfGenerationController < ApplicationController
                             end
                           end
             
-            paths = image_names.map { |image_name| "/digicolapp/datastore/web/#{folder_numbers}/#{folder_type}/#{image_name}" }            
+            # paths = image_names.map { |image_name| "/digicolapp/datastore/web/#{folder_numbers}/#{folder_type}/#{image_name}" }            
+            paths = image_names.map do |image_name|
+              next if image_name == "DigitalCollections.jpg"
+              
+              "/digicolapp/datastore/web/#{folder_numbers}/#{folder_type}/#{image_name}"
+            end.compact
 
             response.headers['Content-Type'] = 'application/pdf'
             response.headers['Content-Disposition'] = "attachment; filename=\"#{work_id}.pdf\""           
 
             # Call the method to generate and download the PDF
-            generate_and_download_pdf(paths, work_id, title, shelf_mark, doi, creator, contributor, date_created)
+            generate_and_download_pdf(paths, work_id, title, shelf_mark, doi, creator, contributor, date_created, ocr_checkbox_val )
           else
             # Handle the case where image names could not be retrieved
             Rails.logger.error "Error: Image names could not be retrieved from Solr"
@@ -123,7 +168,7 @@ class PdfGenerationController < ApplicationController
       end
     end   
     
-    def generate_and_download_pdf(paths, file_set_id, title, shelf_mark, doi, creator, contributor, date_created)
+    def generate_and_download_pdf(paths, file_set_id, title, shelf_mark, doi, creator, contributor, date_created, ocr_checkbox_val)
       begin
         # Create a new PDF document
         pdf = Prawn::Document.new
@@ -135,12 +180,34 @@ class PdfGenerationController < ApplicationController
         # Initialize a flag to check if any images have been added
         images_added = false
     
+        if ocr_checkbox_val.to_s == "true"
+          # Initialize text file handling
+          text_file_path = "/digicolapp/datastore/pdf/text/#{file_set_id}.txt"
+          File.open(text_file_path, 'w') {} # Create an empty text file
+        end
+
         paths.each do |url|
           # Get the image data
           image_data = URI.open(url).read
     
          # Resize and compress the image
           resized_image_data = resize_image(image_data)
+
+          if ocr_checkbox_val.to_s == "true"
+            # Save the resized image to a temporary file
+            temp_image_path = "/digicolapp/datastore/pdf/temp/#{File.basename(url)}"
+            File.open(temp_image_path, 'wb') { |f| f.write resized_image_data }
+
+            # Extract text from the image using rtesseract
+            ocr = RTesseract.new(temp_image_path)
+            ocr_text = ocr.to_s
+
+            # Write extracted text to the text file
+            File.open(text_file_path, 'a') { |f| f.puts ocr_text }
+            
+            # Delete the temporary image file after extraction
+            File.delete(temp_image_path) if File.exist?(temp_image_path)
+          end
 
           # If images haven't been added yet, don't start a new page
           if images_added 
@@ -172,9 +239,16 @@ class PdfGenerationController < ApplicationController
         pdf_filename = "#{file_set_id}.pdf"
         pdf_path = "/digicolapp/datastore/pdf/#{pdf_filename}"           
         pdf.render_file(pdf_path)
-    
-        # Send the existing PDF file to the user
-        send_file pdf_path, filename: pdf_filename, type: 'application/pdf', disposition: 'inline'
+
+        if ocr_checkbox_val.to_s == "true"
+          ocr_language = params[:language]
+          ocr_engine = params[:engine]
+          pdf_source = params[:source]
+          
+          ocr_and_download_searchable_pdf(pdf_path, ocr_language, ocr_engine, pdf_source)
+        else    
+          send_file pdf_path, filename: pdf_filename, type: 'application/pdf', disposition: 'inline'
+        end  
       rescue => e
         backtrace = e.backtrace.first
         Rails.logger.error "Error: #{e.message}, Raised at: #{backtrace}"
@@ -190,47 +264,78 @@ class PdfGenerationController < ApplicationController
         format.json { render json: { pdf_file_exists: @pdf_file_exists } }
       end
     end
+
+
+    def downloadPdfTextFile
+      file_set_id = params[:file_set_id]  
+      existing_text_path = "/digicolapp/datastore/pdf/text/#{file_set_id}.txt"
+
+      if File.exist?(existing_text_path) 
+          Rails.logger.debug "PDF text file already exists. Sending existing PDF text file."
+
+          # Send the existing PDF text file as a download to the user
+          send_file existing_text_path, filename: "#{file_set_id}.txt", type: 'application/text', disposition: 'inline'
+      end     
+    end
+    
+    # Check if pdf text file exists
+    def pdf_text_file_exists
+      file_set_id = params[:file_set_id]
+      @text_file_exists = File.exist?("/digicolapp/datastore/pdf/text/#{file_set_id}.txt")
+    
+      respond_to do |format|
+        format.json { render json: { text_file_exists: @text_file_exists } }
+      end
+    end
     
     
   
     private
   
-    def add_title_page(pdf, title, shelf_mark, doi, creator, contributor, date_created, logo_path)
+   def add_title_page(pdf, title, shelf_mark, doi, creator, contributor, date_created, logo_path)
+      # Add a UTF-8 compatible font family (Open Sans in this case)
+      pdf.font_families.update("OpenSans" => {
+        normal: "app/assets/fonts/OpenSans-Regular.ttf",
+        bold: "app/assets/fonts/OpenSans-Bold.ttf",
+        italic: "app/assets/fonts/OpenSans-RegularItalic.ttf"
+      })
+
+      # Use the Open Sans font
+      pdf.font "OpenSans"
 
       # Add your logo at the top left corner
       pdf.image logo_path, position: :left, width: 232, height: 62      
       pdf.move_down 22 # Adjust as needed
-    
+
       # Add the title
       pdf.font_size 14
-      pdf.text title, style: :bold, encoding: 'UTF-8'
+      pdf.text title, style: :bold
       pdf.move_down 10
-    
 
       pdf.font_size 12
       # Add Shelf Mark/Reference Number
-      pdf.text "Shelf Mark/Reference Number", style: :bold, encoding: 'UTF-8'
-      pdf.text "#{shelf_mark}", encoding: 'UTF-8'
+      pdf.text "Shelf Mark/Reference Number", style: :bold
+      pdf.text "#{shelf_mark}"
       pdf.move_down 10
-    
+
       # Add DOI
-      pdf.text "DOI", style: :bold, encoding: 'UTF-8'
-      pdf.text "#{doi}", encoding: 'UTF-8'
+      pdf.text "DOI", style: :bold
+      pdf.text "#{doi}"
       pdf.move_down 10
-    
+
       # Add Creator(s)
-      pdf.text "Creator", style: :bold, encoding: 'UTF-8'
-      creator.each { |c| pdf.text "#{c}", encoding: 'UTF-8' }
+      pdf.text "Creator", style: :bold
+      creator.each { |c| pdf.text "#{c}" }
       pdf.move_down 10
-    
+
       # Add Contributor(s)
-      pdf.text "Contributor", style: :bold, encoding: 'UTF-8'
-      contributor.each { |c| pdf.text "#{c}", encoding: 'UTF-8' }
+      pdf.text "Contributor", style: :bold
+      contributor.each { |c| pdf.text "#{c}" }
       pdf.move_down 10
-    
+
       # Add Date Created
-      pdf.text "Date", style: :bold, encoding: 'UTF-8'
-      pdf.text "#{date_created}", encoding: 'UTF-8'
+      pdf.text "Date", style: :bold
+      pdf.text "#{date_created}"
       pdf.move_down 10          
 
       # Add the fixed text at the bottom center
@@ -241,8 +346,8 @@ class PdfGenerationController < ApplicationController
                   width: pdf.bounds.width,
                   height: 30,
                   size: 8,
-                  align: :center,
-                  encoding: 'UTF-8')
+                  align: :center)
+                
     end
 
     def resize_image(image_data)
@@ -280,4 +385,99 @@ class PdfGenerationController < ApplicationController
         Rails.logger.debug "PDF File not found."
       end
     end
+
+    def ocr_and_download_searchable_pdf(pdf_path, ocr_language, ocr_engine, pdf_source)
+      file_set_id = params[:file_set_id]
+      public_pdf_path = Rails.root.join('public', "#{file_set_id}.pdf")
+    
+      # Copy the PDF file to the public folder
+      FileUtils.cp(pdf_path, public_pdf_path)
+    
+      # Perform OCR using OCR Space API depends on Source Type
+      ocr_response = nil
+      if pdf_source == "file"
+        ocr_response = perform_ocr_file(pdf_path, ocr_language, ocr_engine)
+      elsif pdf_source == "url"
+        ocr_response = perform_ocr_url(file_set_id, ocr_language, ocr_engine)
+      end
+    
+      if ocr_response['SearchablePDFURL'].present?
+        searchable_pdf_url = ocr_response['SearchablePDFURL']
+        Rails.logger.debug "searchable_pdf_url #{searchable_pdf_url}"
+        # Download the searchable PDF
+        downloaded_pdf_path = download_searchable_pdf(searchable_pdf_url, pdf_path)
+    
+        File.delete(public_pdf_path) if File.exist?(public_pdf_path) 
+    
+        # Send the downloadable PDF to the user
+        pdf_filename = "#{file_set_id}_TextSearchable.pdf" 
+        Rails.logger.debug "pdf_filename #{pdf_filename}"
+        Rails.logger.debug "downloaded_pdf_path #{downloaded_pdf_path}"
+        send_file downloaded_pdf_path, filename: pdf_filename, type: 'application/pdf', disposition: 'inline'
+      else
+        
+        File.delete(public_pdf_path) if File.exist?(public_pdf_path)
+    
+        Rails.logger.debug "OCR failed or no searchable PDF found."
+      end
+    end
+
+    # Perform OCR when PDF source is URL
+    def perform_ocr_url(file_set_id, ocr_language, ocr_engine)
+      # THIS - uncomment the nxt line once in live
+      pdf_url="https://digitalcollections.tcd.ie/#{file_set_id}.pdf" 
+      # Delete or comment the next one line once in live- THIS
+      # pdf_url="https://digitalcollections.tcd.ie/temp.pdf"
+
+      Rails.logger.debug "path_pdf: #{pdf_url}"   
+
+      response = RestClient::Request.execute(method: :post, url: OCR_SPACE_API_URL, payload: {
+                                  apikey: API_KEY,
+                                  language: ocr_language,
+                                  url: pdf_url,
+                                  filetype: 'PDF',
+                                  isCreateSearchablePdf: true,
+                                  isSearchablePdfHideTextLayer: true,
+                                  OCREngine: ocr_engine
+                                },
+                                headers: {
+                                  content_type: 'application/pdf'
+                                })
+                               
+      Rails.logger.debug "response: #{response.body}"
+      JSON.parse(response.body)
+    end
+
+     # Perform OCR when PDF source is FILE
+    def perform_ocr_file(pdf_path, ocr_language, ocr_engine)
+
+      uri = URI.parse(OCR_SPACE_API_URL)
+     
+      request = Net::HTTP::Post::Multipart.new(uri.path,
+        {
+          'apikey' => API_KEY,
+          'language' => ocr_language,
+          'isCreateSearchablePdf' => 'true',
+          'isSearchablePdfHideTextLayer' => 'true',
+          'OCREngine' => ocr_engine,
+          'file' => UploadIO.new(pdf_path, 'application/pdf', File.basename(pdf_path)),          
+          'filetype' => 'PDF'
+        }
+      )
+  
+      response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) do |http|
+        http.request(request)
+      end
+      Rails.logger.debug "response: #{response.body}"
+      JSON.parse(response.body)
+    end
+    
+    def download_searchable_pdf(url, original_pdf_path)
+      # downloaded_pdf_path = original_pdf_path.sub(/\.pdf$/, '.pdf')
+      File.open(original_pdf_path, 'wb') do |file|
+        file.write RestClient.get(url).body
+      end  
+      original_pdf_path
+    end
+
   end
