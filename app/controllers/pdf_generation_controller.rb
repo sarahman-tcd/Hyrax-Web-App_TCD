@@ -191,6 +191,9 @@ class PdfGenerationController < ApplicationController
 
             # Write extracted text to the text file
             File.open(text_file_path, 'a') { |f| f.puts ocr_text }
+            
+            # Delete the temporary image file after extraction
+            File.delete(temp_image_path) if File.exist?(temp_image_path)
           end
 
           # If images haven't been added yet, don't start a new page
