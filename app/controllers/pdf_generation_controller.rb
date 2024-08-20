@@ -54,7 +54,7 @@ class PdfGenerationController < ApplicationController
         secondary = 'http://digcoll-solr02.tcd.ie:8983/solr/tcd-hyrax/'
 
         # This- Replace dev to primary 
-        $solr = RSolr.connect(url: dev) 
+        $solr = RSolr.connect(url: primary) 
         work_response = $solr.get('select', params: { q: "id:#{work_id}" })
         work_data = work_response['response']['docs'][0]        
     
@@ -69,18 +69,26 @@ class PdfGenerationController < ApplicationController
           
         folder_numbers = work_data['folder_number_tesim']
         file_set_ids = work_data['file_set_ids_ssim']
+        flag=0
                 
-        if !folder_numbers.present? && file_set_ids.present?
+        if folder_numbers.blank? && file_set_ids.present?
+          Rails.logger.debug "folder_number_tesim #{folder_numbers}"
           rn_file_set_id = work_data['file_set_ids_ssim'].first
           query = "id:#{rn_file_set_id}"
           rn_response = $solr.get('select', params: { q: query })
           rn_file_set_data = rn_response['response']['docs'][0]
           folder_numbers = rn_file_set_data['folder_number_tesim'].first
+          flag=1
         end
         
         if folder_numbers.present? && file_set_ids.present?
           image_names = []
-          folder_numbers = work_data['folder_number_tesim'].first
+          if flag == 0
+            folder_numbers = work_data['folder_number_tesim'].first
+          elsif flag == 1
+            folder_numbers = folder_numbers
+          end
+          
           file_set_ids.each do |file_set_id|
             # Construct a Solr query to fetch the label_ssi for the given file_set_id
             query = "id:#{file_set_id}"
@@ -133,7 +141,12 @@ class PdfGenerationController < ApplicationController
                             end
                           end
             
-            paths = image_names.map { |image_name| "/digicolapp/datastore/web/#{folder_numbers}/#{folder_type}/#{image_name}" }            
+            # paths = image_names.map { |image_name| "/digicolapp/datastore/web/#{folder_numbers}/#{folder_type}/#{image_name}" }            
+            paths = image_names.map do |image_name|
+              next if image_name == "DigitalCollections.jpg"
+              
+              "/digicolapp/datastore/web/#{folder_numbers}/#{folder_type}/#{image_name}"
+            end.compact
 
             response.headers['Content-Type'] = 'application/pdf'
             response.headers['Content-Disposition'] = "attachment; filename=\"#{work_id}.pdf\""           
@@ -412,9 +425,9 @@ class PdfGenerationController < ApplicationController
     # Perform OCR when PDF source is URL
     def perform_ocr_url(file_set_id, ocr_language, ocr_engine)
       # THIS - uncomment the nxt line once in live
-      # pdf_url="https://digitalcollections.tcd.ie/#{file_set_id}.pdf" 
-      # Delete the next one line once in live- THIS
-      pdf_url="https://digitalcollections.tcd.ie/temp.pdf"
+      pdf_url="https://digitalcollections.tcd.ie/#{file_set_id}.pdf" 
+      # Delete or comment the next one line once in live- THIS
+      # pdf_url="https://digitalcollections.tcd.ie/temp.pdf"
 
       Rails.logger.debug "path_pdf: #{pdf_url}"   
 
