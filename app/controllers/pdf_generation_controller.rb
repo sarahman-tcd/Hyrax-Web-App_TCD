@@ -77,6 +77,19 @@ class PdfGenerationController < ApplicationController
           query = "id:#{rn_file_set_id}"
           rn_response = $solr.get('select', params: { q: query })
           rn_file_set_data = rn_response['response']['docs'][0]
+
+          # Check the title_tesim for the second item
+          if rn_file_set_data['title_tesim'].first == 'DigitalCollections.jpg'
+            # If the title is 'DigitalCollections.jpg', use the first item instead
+            rn_file_set_id = work_data['file_set_ids_ssim'][0]
+
+            # Query Solr for the first file set's data
+            query = "id:#{rn_file_set_id}"
+            rn_response = $solr.get('select', params: { q: query })
+            rn_file_set_data = rn_response['response']['docs'][0]
+          end
+
+
           folder_numbers = rn_file_set_data['folder_number_tesim'].first
           flag=1
         end
