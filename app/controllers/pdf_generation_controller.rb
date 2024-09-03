@@ -77,7 +77,7 @@ class PdfGenerationController < ApplicationController
           query = "id:#{rn_file_set_id}"
           rn_response = $solr.get('select', params: { q: query })
           rn_file_set_data = rn_response['response']['docs'][0]
-          folder_numbers = rn_file_set_data['folder_number_tesim'].first
+          folder_numbers = rn_file_set_data['folder_number_tesim'][1]
           flag=1
         end
         
