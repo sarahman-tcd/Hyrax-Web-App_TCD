@@ -54,7 +54,7 @@ class PdfGenerationController < ApplicationController
         secondary = 'http://digcoll-solr02.tcd.ie:8983/solr/tcd-hyrax/'
 
         # This- Replace dev to primary 
-        $solr = RSolr.connect(url: primary) 
+        $solr = RSolr.connect(url: dev) 
         work_response = $solr.get('select', params: { q: "id:#{work_id}" })
         work_data = work_response['response']['docs'][0]        
     
@@ -73,11 +73,11 @@ class PdfGenerationController < ApplicationController
                 
         if folder_numbers.blank? && file_set_ids.present?
           Rails.logger.debug "folder_number_tesim #{folder_numbers}"
-          rn_file_set_id = work_data['file_set_ids_ssim'].first
+          rn_file_set_id = work_data['file_set_ids_ssim'][1]
           query = "id:#{rn_file_set_id}"
           rn_response = $solr.get('select', params: { q: query })
           rn_file_set_data = rn_response['response']['docs'][0]
-          folder_numbers = rn_file_set_data['folder_number_tesim'][1]
+          folder_numbers = rn_file_set_data['folder_number_tesim'].first
           flag=1
         end
         
