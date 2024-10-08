@@ -5,8 +5,13 @@ Rails.application.routes.draw do
   get '/about', to: 'hyrax/pages#show', constraints: AboutParamsConstraint.new, defaults: { key: 'about' }
   get '/about', to: 'hyrax/pages#show', constraints: AboutNoParamsConstraint.new, defaults: { key: 'about' }
 
+  get '/concern/subseries/new', to: 'hyrax/subseries#new', constraints: SubseriesParamsConstraint.new
   get '/concern/subseries/:id', to: 'hyrax/subseries#show', constraints: SubseriesParamsConstraint.new
+
+  get '/concern/works/new', to: 'hyrax/works#new', constraints: SubseriesParamsConstraint.new
   get '/concern/works/:id', to: 'hyrax/works#show', constraints: SubseriesParamsConstraint.new
+
+  get '/concern/folios/new', to: 'hyrax/folios#new', constraints: SubseriesParamsConstraint.new
   get '/concern/folios/:id', to: 'hyrax/folios#show', constraints: SubseriesParamsConstraint.new
 
   constraints AboutParamsConstraint.new do
