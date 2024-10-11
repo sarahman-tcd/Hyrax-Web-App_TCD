@@ -35,10 +35,6 @@
 
       <% unless @presenter.total_viewable_items.blank? %>
           <div class="hyc-bugs">
-            <div class="hyc-item-count">
-              <b><%= @presenter.total_viewable_items %></b>
-              <%= 'Item'.pluralize(@presenter.total_viewable_items) %></div>
-
             <% unless @presenter.creator.blank? %>
                 <div class="hyc-created-by">Created by: <%= @presenter.creator.first %></div>
             <% end %>
@@ -72,7 +68,7 @@
     </div>
     <div class="col-md-4 hyc-metadata">
       <% unless has_collection_search_parameters? %>
-          <h2><%= t('hyrax.dashboard.collections.show.metadata_header') %></h2>
+          <h2>Digital Collection Details</h2>
           <%= render 'show_descriptions' %>
       <% end %>
     </div>
