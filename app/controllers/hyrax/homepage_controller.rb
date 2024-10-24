@@ -66,7 +66,6 @@ class Hyrax::HomepageController < ApplicationController
       sorted_collection.each do |collection|
         collection_id = collection['id']
         tile_order = tile_order_hash[collection_id]
-        Rails.logger.debug "Collection ID: #{collection_id}, Tile Order: #{tile_order}"
       end
 
       sorted_collection

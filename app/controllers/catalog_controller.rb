@@ -19,9 +19,7 @@ class CatalogController < ApplicationController
   end
  
   def get_title_orders
-    Rails.logger.debug "version 2.0 initiated...initialliezed"
     @data = read_existing_data
-    Rails.logger.debug @data
     respond_to do |format|
       format.json { render json: @data }
     end
