@@ -22,7 +22,6 @@ class PdfGenerationController < ApplicationController
     
     def pdf   
       begin   
-        Rails.logger.debug "version 9.0.0 initiated..."
         work_id = params[:file_set_id]         
         ocr_checkbox_val = params[:ocr_checkbox]  
         
@@ -37,7 +36,6 @@ class PdfGenerationController < ApplicationController
         existing_pdf_path = "/digicolapp/datastore/pdf/#{work_id}.pdf"
 
         if File.exist?(existing_pdf_path) 
-          Rails.logger.debug "PDF already exists. Sending existing PDF."
 
           if ocr_checkbox_val.to_s == "true"
              send_file existing_pdf_path, filename: "#{work_id}_TextSearchable.pdf", type: 'application/pdf', disposition: 'inline'
@@ -72,7 +70,6 @@ class PdfGenerationController < ApplicationController
         flag=0
                 
         if folder_numbers.blank? && file_set_ids.present?
-          Rails.logger.debug "folder_number_tesim #{folder_numbers}"
           rn_file_set_id = work_data['file_set_ids_ssim'][1]
           query = "id:#{rn_file_set_id}"
           rn_response = $solr.get('select', params: { q: query })
@@ -284,8 +281,6 @@ class PdfGenerationController < ApplicationController
       existing_text_path = "/digicolapp/datastore/pdf/text/#{file_set_id}.txt"
 
       if File.exist?(existing_text_path) 
-          Rails.logger.debug "PDF text file already exists. Sending existing PDF text file."
-
           # Send the existing PDF text file as a download to the user
           send_file existing_text_path, filename: "#{file_set_id}.txt", type: 'application/text', disposition: 'inline'
       end     
@@ -416,7 +411,6 @@ class PdfGenerationController < ApplicationController
     
       if ocr_response['SearchablePDFURL'].present?
         searchable_pdf_url = ocr_response['SearchablePDFURL']
-        Rails.logger.debug "searchable_pdf_url #{searchable_pdf_url}"
         # Download the searchable PDF
         downloaded_pdf_path = download_searchable_pdf(searchable_pdf_url, pdf_path)
     
@@ -424,14 +418,10 @@ class PdfGenerationController < ApplicationController
     
         # Send the downloadable PDF to the user
         pdf_filename = "#{file_set_id}_TextSearchable.pdf" 
-        Rails.logger.debug "pdf_filename #{pdf_filename}"
-        Rails.logger.debug "downloaded_pdf_path #{downloaded_pdf_path}"
         send_file downloaded_pdf_path, filename: pdf_filename, type: 'application/pdf', disposition: 'inline'
       else
         
         File.delete(public_pdf_path) if File.exist?(public_pdf_path)
-    
-        Rails.logger.debug "OCR failed or no searchable PDF found."
       end
     end
 
@@ -442,8 +432,7 @@ class PdfGenerationController < ApplicationController
       # Delete or comment the next one line once in live- THIS
       # pdf_url="https://digitalcollections.tcd.ie/temp.pdf"
 
-      Rails.logger.debug "path_pdf: #{pdf_url}"   
-
+    
       response = RestClient::Request.execute(method: :post, url: OCR_SPACE_API_URL, payload: {
                                   apikey: API_KEY,
                                   language: ocr_language,
@@ -457,7 +446,6 @@ class PdfGenerationController < ApplicationController
                                   content_type: 'application/pdf'
                                 })
                                
-      Rails.logger.debug "response: #{response.body}"
       JSON.parse(response.body)
     end
 
@@ -481,7 +469,6 @@ class PdfGenerationController < ApplicationController
       response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) do |http|
         http.request(request)
       end
-      Rails.logger.debug "response: #{response.body}"
       JSON.parse(response.body)
     end
     
