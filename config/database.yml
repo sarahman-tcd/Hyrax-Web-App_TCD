@@ -13,10 +13,20 @@ default: &default
   database: <%= ENV['MYSQL_DATABASE'] || 'dev_hyrax' %>
   pool: 5
 
+# development:
+#   <<: *default
+#   username: <%= ENV['HYRAX_DATABASE_USER'] || 'hyraxuser' %>
+#   password: <%= ENV['HYRAX_DATABASE_PASSWORD'] || '#Pa$$w0rd' %>
+
 development:
-  <<: *default
-  username: <%= ENV['HYRAX_DATABASE_USER'] || 'hyraxuser' %>
-  password: <%= ENV['HYRAX_DATABASE_PASSWORD'] || '#Pa$$w0rd' %>
+  adapter: mysql2
+  encoding: utf8mb4
+  host: localhost
+  database: hyrax
+  username: hyraxuser
+  password: "#Pa$$w0rd"
+
+
 
 demovm045:
   <<: *default

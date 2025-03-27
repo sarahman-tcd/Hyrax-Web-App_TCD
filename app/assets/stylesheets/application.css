@@ -15,6 +15,10 @@
  *= require_self
  */
 
+ /*
+ *= require leaflet
+ */
+
  @font-face {
    font-family: 'TCDWebFont';
    src: url('OpenSans-Light.ttf')  format('truetype'); /* Safari, Android, iOS */

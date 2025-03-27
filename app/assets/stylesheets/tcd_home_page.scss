@@ -116,12 +116,13 @@
 
 .TCD_library_bar {
   border: 0px;
-  height: 40px;
+  height: 30px;
   color: #ffffff;
   background-color: #1074b7;
   padding-left: 20px;
   font-weight: 200;
   text-align: left;
+  font-size: x-large;
 }
 
 .TCD_small_library_bar {
@@ -132,6 +133,7 @@
   padding-left: 20px;
   font-weight: 200;
   text-align: left;
+  font-size: small;
 }
 
 // not on homepage, this is for the collapsible text when displaying works, folios, subseries

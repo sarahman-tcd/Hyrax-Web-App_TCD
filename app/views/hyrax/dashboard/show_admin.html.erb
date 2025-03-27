@@ -98,7 +98,7 @@
   <div class="col-md-12">
     <div class="panel panel-default">
     <!-- <a href="import/index">Ingest >> </a> <br /> -->
-    Revision: <%= File.read("REVISION") %>
+    Revision: <%= File.exist?("REVISION") ? File.read("REVISION") : "N/A" %>
     </div>
   </div>
 </div>
