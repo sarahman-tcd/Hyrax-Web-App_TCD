@@ -1,4 +1,6 @@
 <div id="content" class="col-md-9 col-md-push-3 col-sm-8 col-sm-push-4">
+<input type="hidden" id="current-search-params" value='<%= params.to_unsafe_h.to_json %>'>
+
   <div id="publisher-location-map" class="hidden-map">
     <div id="map-loading">
       <p>Loading map, please wait...</p>
@@ -138,7 +140,7 @@
     }); 
 </script>
 <script>
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener("turbolinks:load", function () {
     // Find all the constraint-value spans
     const constraintSpans = document.querySelectorAll('.constraint-value');
 

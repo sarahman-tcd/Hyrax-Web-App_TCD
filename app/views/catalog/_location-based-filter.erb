@@ -38,8 +38,16 @@ function loadMap() {
     let locations = [];
     let locationData = {};
     let markers = [];
-
-    fetch('/catalog/browse_location.json')
+    
+    const rawParams = document.getElementById("current-search-params")?.value;
+    const searchParams = rawParams ? JSON.parse(rawParams) : {};
+    const queryString = new URLSearchParams(searchParams).toString();
+    console.log("rawParams:", rawParams);
+    console.log("queryString:", queryString);
+    console.log("searchParams:", searchParams);
+    console.log("Final URL:", `/catalog/browse_location.json?${queryString}`);
+    
+    fetch(`/catalog/browse_location.json?${queryString}`)
     .then(response => response.json())
     .then(data => {
         locations = Object.entries(data.locations);

@@ -4,7 +4,7 @@
     <div class="form-group simple-search-panel">
       <div class="input-group full-width-search " >
         <div style="position: relative; display: inline-block; width: 100%;">
-          <%= text_field_tag :q, current_search_parameters, class: "q form-control", id: "search-field-header", placeholder: "" %>
+          <%= text_field_tag :q, current_search_parameters, class: "q form-control", id: "search-field-header", placeholder: "Search Entire Collection" %>
           
           <i class="fa fa-info-circle" data-toggle="tooltip" title="Please avoid using special characters (e.g., @, #, $, %, &, -, +, *)"
             style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #6a6a6a8f; z-index: 100;font-size: large;"></i>
@@ -58,7 +58,11 @@
 
       <div class="form-group" >
         <label  id="add-line"  class="btn clickable-add-option"><i class="fa fa-plus"></i> Add New Search</label>  
-        <label  id="clear-all"  class="btn clickable-clear-option"><i class="fa fa-refresh"></i> Clear All</label>  
+        <label id="clear-all"
+              class="btn clickable-clear-option"
+              data-redirect-url="<%= main_app.search_catalog_path(f: { human_readable_type_sim: ["Collection"]}) %>">
+          <i class="fa fa-refresh"></i> Clear All
+        </label>
       </div>
       
       <br>
@@ -97,22 +101,24 @@
 
 
 <script>
-  document.addEventListener("DOMContentLoaded", function() {
+document.addEventListener("turbolinks:load", function () {
 
       $('#search-field-header').removeAttr('value');
       //Placeholder Animation
       const searchField = document.getElementById("search-field-header");
-      const placeholderText = "Search Entire Collection";
+      
+      //const placeholderText = "Search Entire Collection";
       let index = 0;
+      //$("#search-field-header").attr("placeholder", "");
 
-      const intervalId = setInterval(() => {
-        if (index < placeholderText.length) {
-          searchField.placeholder += placeholderText[index];
-          index++;
-        } else {
-          clearInterval(intervalId);
-        }
-      }, 120); 
+      //const intervalId = setInterval(() => {
+      //  if (index < placeholderText.length) {
+      //    searchField.placeholder += placeholderText[index];
+      //    index++;
+      //  } else {
+      //    clearInterval(intervalId);
+      //  }
+      //}, 120); 
 
       //Search Info Tooltip
       $('[data-toggle="tooltip"]').tooltip();
@@ -658,7 +664,10 @@
         document.getElementById("advance-search-option").style.display = 'block';
 
         // Refresh the page to reset everything
-        location.reload();
+        const url = clearAllButton.getAttribute("data-redirect-url");
+        if (url) {
+          window.location.href = url;
+        }
     });
 
    

@@ -128,19 +128,42 @@ end
 
 def browse_location
   begin
-    all_docs = Rails.cache.read("all_search_results") || []  
-
-    if all_docs.empty?
-      Rails.logger.warn "No stored search results found in cache"
-      render json: { locations: {}, unidentified: {}, location_ids: {} } and return
+    search_params = params.to_unsafe_h.deep_symbolize_keys
+    search_params[:q] = params[:q].present? ? params[:q] : '*:*'
+    search_params[:page] = 1
+    search_params[:rows] = 100  # Default per page; will loop to get all
+    Rails.logger.debug "this: BL search param with date: #{search_params}"
+    # Optional: extract date range and clean it from query
+    user_input = nil
+    date_range_match = search_params[:q].match(/date_created_tesim:\[(-?\d{1,4})TO(-?\d{1,4})\]/)
+    if date_range_match
+      start_year, end_year = date_range_match.captures.map(&:to_i)
+      user_input = "#{start_year},#{end_year}"
+      search_params[:q].sub!(/AND?\s*\(?date_created_tesim:\[.*?\]\)?/, '')
     end
 
-    Rails.logger.debug "Total Documents Received: #{all_docs.size}"
+        Rails.logger.debug "this: BL search param without date: #{search_params}"
 
-    # Step 1: Normalize location names
+    all_results = []
+    current_page = 1
+
+    loop do
+      search_params[:page] = current_page
+      response, docs = search_results(search_params)
+      all_results.concat(docs)
+
+      break if docs.size < search_params[:rows].to_i
+      current_page += 1
+    end
+
+    if start_year && end_year && date_range_match
+      all_results = filter_documents_by_date_range(all_results, user_input)
+    end
+
+    # Then continue your logic with `all_results`
     normalized_location_counts = Hash.new { |hash, key| hash[key] = { count: 0, ids: [] } }
 
-    all_docs.each do |doc|
+    all_results.each do |doc|
       raw_location = doc['publisher_location_tesim']&.first || "Unidentified"
       normalized_location = raw_location.is_a?(Array) ? raw_location.join(', ').strip : raw_location.to_s.strip
 
@@ -148,24 +171,21 @@ def browse_location
       normalized_location_counts[normalized_location][:ids] << doc['id']
     end
 
-    # Step 2: Get lat-long mappings
     location_counts = normalized_location_counts.transform_values { |v| v[:count] }
     @location_latlong = get_latlong_for_locations(location_counts)
-
-    Rails.logger.debug "Sending JSON Response: #{@location_latlong.to_json}"
-
-    # Step 3: Handle unidentified locations
     unidentified_count = normalized_location_counts.delete("Unidentified")&.dig(:count) || 0
     @unidentified = { "Unidentified" => { count: unidentified_count } }
 
-    # Step 4: Return updated JSON with IDs
-    render json: { locations: @location_latlong, unidentified: @unidentified, location_ids: normalized_location_counts }
+    render json: {
+      locations: @location_latlong,
+      unidentified: @unidentified,
+      location_ids: normalized_location_counts
+    }
   rescue => e
     Rails.logger.error "Error: #{e.message}, Raised at: #{e.backtrace.first}"
     render json: { error: e.message }, status: :internal_server_error
   end
 end
-
 
  #--------Browse Publisher Location Using Map------#
 
@@ -174,13 +194,19 @@ end
 def index
   super  # Ensure Blacklight handles default behavior
   begin   
-    search_params = params.to_unsafe_h.deep_dup    
+    search_params = params.to_unsafe_h.deep_symbolize_keys 
     search_params[:q] = params[:q].present? ? params[:q] : '*:*'
     search_params[:page] = params[:page] || 1  
-    search_params[:rows] = params[:rows] || 10 
+    search_params[:page] = 1 if params[:location_filter].present? && params[:page].blank?
     search_params[:sort] = params[:sort] || blacklight_config.sort_fields.keys.first
     search_params[:per_page] = params[:per_page] || 10
 
+    date_range_match = search_params[:q].match(/date_created_tesim:\[(-?\d{1,4})TO(-?\d{1,4})\]/)    
+    if date_range_match
+      start_year, end_year = date_range_match.captures.map(&:to_i)
+      search_params[:q].sub!(/AND?\s*\(?date_created_tesim:\[.*?\]\)?/, '') 
+    end   
+    Rails.logger.debug "this: search param without date: #{search_params}"
 
     if params[:location_filter].present?
       location_ids = params[:location_filter].split(',')
@@ -188,61 +214,80 @@ def index
       
       # Combine this into the existing query
       search_params[:q] = "#{search_params[:q]} AND #{location_filter_query}"
-      Rails.logger.debug "Combined query with location filter: #{search_params[:q]}"
+      Rails.logger.debug "this: Final Search Params Sent to SearchBuilder: #{search_params.inspect}"
+      @response, @documents = search_results(search_params)
+      Rails.logger.debug "this: SOLR returned: #{@response.total} total hits, #{@documents.count} on this page"
+
+      respond_to do |format|
+        format.html { render :index }  # Normal page load
+        format.json { render json: { response: @response, documents: @documents } }  # API JSON response
+        format.js { render partial: 'catalog/search_results', formats: [:js] }  # Ensure JavaScript format is handled
+      end
+      return
     end
 
-    Rails.logger.debug "Final Search Params Sent to SearchBuilder: #{search_params.inspect}"
-    
+    search_params[:rows] = params[:rows] || 10 
 
-    date_range_match = search_params[:q].match(/date_created_tesim:\[(-?\d{1,4})TO(-?\d{1,4})\]/)
-    
-    if date_range_match
-      start_year, end_year = date_range_match.captures.map(&:to_i)
-      search_params[:q].sub!(/AND?\s*\(?date_created_tesim:\[.*?\]\)?/, '') 
-    end
-   
-    Rails.logger.debug "search param: #{search_params}"
-    @response, @documents = search_results(search_params)
-    Rails.logger.debug "Initial documents count (before filtering): #{@documents.count}"
- 
-    if start_year && end_year && date_range_match
-      user_input = "#{start_year},#{end_year}"
-      Rails.logger.debug "User input date range: #{user_input}"
-      @documents = filter_documents_by_date_range(@documents, user_input)
-      Rails.logger.debug "filtered_results: #{@documents.count}"
-    end
-    # Rails.logger.debug "Filtered documents count (after manual date filtering): #{@documents.count}"
-    #==================================================================================================================
+    Rails.logger.debug "this: Final Search Params Sent to SearchBuilder: #{search_params.inspect}"
+
     all_results = []
     current_page = 1
-    
-    # Fetch all pages first (without filtering inside the loop)
     loop do
-      search_params[:page] = current_page      
+      search_params[:page] = current_page
       response, docs = search_results(search_params)  # Get next batch of documents
-      
       all_results.concat(docs)  # Collect all results
-    
-      break if docs.size < search_params[:rows]  # Stop if last page is reached
+      break if docs.size < search_params[:rows].to_i  # Stop if last page is reached
       current_page += 1
     end
-    
-    Rails.logger.debug "all_results: #{all_results.count}"
-    # Apply filtering once on the final collected dataset
-    Rails.logger.debug "all_results: #{user_input}"
+
+    # Apply date range filter
     if start_year && end_year && date_range_match
-      filtered_results = filter_documents_by_date_range(all_results, user_input)
-      Rails.logger.debug "filtered_results: #{filtered_results.count}"    
-      # Cache only the final filtered data
-      Rails.cache.write("all_search_results", filtered_results.map(&:to_h), expires_in: 1.hour)
-    end 
+      filtered_ids = filter_documents_by_date_range(all_results, "#{start_year},#{end_year}")
+       Rails.logger.debug "this: filtered_ids: #{filtered_ids}"
+      # Add the filtered IDs into the query string to limit results
+      location_filter_query = "id:(" + filtered_ids.map { |id| "\"#{id}\"" }.join(" OR ") + ")"
+      search_params[:q] = "#{search_params[:q]} AND #{location_filter_query}"
 
-    #==================================================================================================================
+      Rails.logger.debug "this: Final Search Params with Filtered IDs: #{search_params.inspect}"
+    end
 
+    # Perform the search again with the updated parameters (filtered by ID)
+    @response, @documents = search_results(search_params)
+    Rails.logger.debug "this: Filtered documents count (after applying date filter): #{@documents.count}"
 
+    
+  # #==========================================JUST2CACHEaLL4LOCATIONmAP=============================
+  #   all_results = []
+  #   current_page = 1
+    
+  #   # Fetch all pages first (without filtering inside the loop)
+  #   loop do
+  #     search_params[:page] = current_page      
+  #     response, docs = search_results(search_params)  # Get next batch of documents
+      
+  #     all_results.concat(docs)  # Collect all results
+    
+  #     break if docs.size < search_params[:rows]  # Stop if last page is reached
+  #     current_page += 1
+  #   end
+    
+  #   Rails.logger.debug "this: all_results: #{all_results.count}"
+  #   # Apply filtering once on the final collected dataset
+  #   Rails.logger.debug "all_results: #{user_input}"
+  #   # This startYear endYear validation is to check if the date_created_tesim has not been sent.
+  #   if start_year && end_year && date_range_match
+  #     filtered_results = filter_documents_by_date_range(all_results, user_input)
+  #     Rails.logger.debug "this: filtered_results: #{filtered_results.count}"    
+  #     # Cache only the final filtered data
+  #     Rails.cache.write("all_search_results", filtered_results.map(&:to_h), expires_in: 1.hour)
+  #   end 
+
+  # #==================================================================================================================
+
+      Rails.logger.debug "this: the updated returned: #{@response.total} total hits, #{@documents.count} on this page"
 
     respond_to do |format|
-      format.html { render :index }  # Normal page load
+      format.html { render :index }  # Normal page loadSouvenir
       format.json { render json: { response: @response, documents: @documents } }  # API JSON response
       format.js { render partial: 'catalog/search_results', formats: [:js] }  # Ensure JavaScript format is handled
     end
@@ -335,15 +380,14 @@ end
 
 def filter_documents_by_date_range(documents, user_range)
   start_year, end_year = user_range.split(",").map(&:to_i)
+Rails.logger.debug "this: docu count in filter method: #{documents.count} on this page"
+  filtered_ids = []  # Initialize an empty array to collect IDs
 
-  documents.select do |doc|
+  documents.each do |doc|
     next unless doc['date_created_tesim'].is_a?(Array) # Ensure it's an array
 
     # Extract years from all date strings
     extracted_years = doc['date_created_tesim'].flat_map { |date_str| extract_years(date_str) }
-
-    # Log extracted years for debugging
-    Rails.logger.debug "Extracted Years for Document: #{extracted_years}"
 
     # Handle cases where "start" and "end" are in separate elements
     start_years = doc['date_created_tesim'].grep(/start/i).flat_map { |date_str| extract_years(date_str) }
@@ -352,17 +396,21 @@ def filter_documents_by_date_range(documents, user_range)
     if start_years.any? && end_years.any?
       sorted_years = [start_years.min, end_years.max].sort # Ensure proper order
       combined_range = (sorted_years.first..sorted_years.last).to_a
-      Rails.logger.debug "Combined Start-End Range: #{combined_range}"
 
       # Instead of returning `true`, return `doc` if it's in range
-      next doc if combined_range.any? { |year| year.between?(start_year, end_year) }
+      if combined_range.any? { |year| year.between?(start_year, end_year) }
+        filtered_ids << doc['id']  # Collect the document ID if it matches the range
+      end
     end
-    Rails.logger.debug "StartYear-EndYear: #{start_year} to #{end_year}"
 
     # Check if any extracted year falls within the user-specified range
-    extracted_years.any? { |year| year.between?(start_year, end_year) }
+    if extracted_years.any? { |year| year.between?(start_year, end_year) }
+      filtered_ids << doc['id']  # Collect the document ID if it matches the range
+    end
   end
+  filtered_ids  # Return the array of filtered IDs
 end
+
 
 
 
@@ -427,11 +475,11 @@ def extract_years(date_string)
   years.uniq.sort
 end
 
-def add_publisher_location_filter(solr_parameters)
-  solr_parameters[:fq] ||= []
-  solr_parameters[:fq] << 'publisher_location_tesim:[* TO *]'#THIS- why TO and space before and after TO # Filter for docs with this field
-  solr_parameters[:fl] ||= 'id, publisher_location_tesim'     # Return only these fields
-end
+# def add_publisher_location_filter(solr_parameters)
+#   solr_parameters[:fq] ||= []
+#   solr_parameters[:fq] << 'publisher_location_tesim:[* TO *]'#THIS- why TO and space before and after TO # Filter for docs with this field
+#   solr_parameters[:fl] ||= 'id, publisher_location_tesim'     # Return only these fields
+# end
  
 def get_latlong_for_locations_old(locations_with_count)
   api_key = 'AIzaSyB7n9JSvr5tZX8lZMzTDMNWk9e11MgLYek'
