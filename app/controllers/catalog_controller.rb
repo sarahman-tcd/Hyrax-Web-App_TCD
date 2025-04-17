@@ -191,13 +191,14 @@ end
 
  #--------Advance Search------#
 
-def index
+ def index
   super  # Ensure Blacklight handles default behavior
   begin   
-    search_params = params.to_unsafe_h.deep_symbolize_keys 
+    search_params = params.to_unsafe_h.deep_symbolize_keys  
     search_params[:q] = params[:q].present? ? params[:q] : '*:*'
     search_params[:page] = params[:page] || 1  
     search_params[:page] = 1 if params[:location_filter].present? && params[:page].blank?
+    
     search_params[:sort] = params[:sort] || blacklight_config.sort_fields.keys.first
     search_params[:per_page] = params[:per_page] || 10
 
@@ -226,68 +227,23 @@ def index
       return
     end
 
-    search_params[:rows] = params[:rows] || 10 
-
-    Rails.logger.debug "this: Final Search Params Sent to SearchBuilder: #{search_params.inspect}"
-
-    all_results = []
-    current_page = 1
-    loop do
-      search_params[:page] = current_page
-      response, docs = search_results(search_params)  # Get next batch of documents
-      all_results.concat(docs)  # Collect all results
-      break if docs.size < search_params[:rows].to_i  # Stop if last page is reached
-      current_page += 1
+    search_params[:rows] = if start_year && end_year && date_range_match
+      20000  # Pull more results than needed
+    else
+      params[:rows] || 10
     end
 
-    # Apply date range filter
-    if start_year && end_year && date_range_match
-      filtered_ids = filter_documents_by_date_range(all_results, "#{start_year},#{end_year}")
-       Rails.logger.debug "this: filtered_ids: #{filtered_ids}"
-      # Add the filtered IDs into the query string to limit results
-      location_filter_query = "id:(" + filtered_ids.map { |id| "\"#{id}\"" }.join(" OR ") + ")"
-      search_params[:q] = "#{search_params[:q]} AND #{location_filter_query}"
-
-      Rails.logger.debug "this: Final Search Params with Filtered IDs: #{search_params.inspect}"
-    end
-
-    # Perform the search again with the updated parameters (filtered by ID)
     @response, @documents = search_results(search_params)
-    Rails.logger.debug "this: Filtered documents count (after applying date filter): #{@documents.count}"
-
+ 
+    if start_year && end_year && date_range_match
+      user_input = "#{start_year},#{end_year}"
+      Rails.logger.debug "User input date range: #{user_input}"
+      @documents = filter_documents_by_date_range(@documents, user_input)
+      Rails.logger.debug "filtered_results: #{@documents.count}"
+    end
     
-  # #==========================================JUST2CACHEaLL4LOCATIONmAP=============================
-  #   all_results = []
-  #   current_page = 1
-    
-  #   # Fetch all pages first (without filtering inside the loop)
-  #   loop do
-  #     search_params[:page] = current_page      
-  #     response, docs = search_results(search_params)  # Get next batch of documents
-      
-  #     all_results.concat(docs)  # Collect all results
-    
-  #     break if docs.size < search_params[:rows]  # Stop if last page is reached
-  #     current_page += 1
-  #   end
-    
-  #   Rails.logger.debug "this: all_results: #{all_results.count}"
-  #   # Apply filtering once on the final collected dataset
-  #   Rails.logger.debug "all_results: #{user_input}"
-  #   # This startYear endYear validation is to check if the date_created_tesim has not been sent.
-  #   if start_year && end_year && date_range_match
-  #     filtered_results = filter_documents_by_date_range(all_results, user_input)
-  #     Rails.logger.debug "this: filtered_results: #{filtered_results.count}"    
-  #     # Cache only the final filtered data
-  #     Rails.cache.write("all_search_results", filtered_results.map(&:to_h), expires_in: 1.hour)
-  #   end 
-
-  # #==================================================================================================================
-
-      Rails.logger.debug "this: the updated returned: #{@response.total} total hits, #{@documents.count} on this page"
-
     respond_to do |format|
-      format.html { render :index }  # Normal page loadSouvenir
+      format.html { render :index }  # Normal page load
       format.json { render json: { response: @response, documents: @documents } }  # API JSON response
       format.js { render partial: 'catalog/search_results', formats: [:js] }  # Ensure JavaScript format is handled
     end
@@ -296,6 +252,9 @@ def index
     render json: { error: 'An error occurred during the search.', details: e.message }, status: :internal_server_error
   end
 end
+
+
+
 
 
 
@@ -380,14 +339,14 @@ end
 
 def filter_documents_by_date_range(documents, user_range)
   start_year, end_year = user_range.split(",").map(&:to_i)
-Rails.logger.debug "this: docu count in filter method: #{documents.count} on this page"
-  filtered_ids = []  # Initialize an empty array to collect IDs
-
-  documents.each do |doc|
+  documents.select do |doc|
     next unless doc['date_created_tesim'].is_a?(Array) # Ensure it's an array
 
     # Extract years from all date strings
     extracted_years = doc['date_created_tesim'].flat_map { |date_str| extract_years(date_str) }
+
+    # Log extracted years for debugging
+    Rails.logger.debug "Extracted Years for Document: #{extracted_years}"
 
     # Handle cases where "start" and "end" are in separate elements
     start_years = doc['date_created_tesim'].grep(/start/i).flat_map { |date_str| extract_years(date_str) }
@@ -396,19 +355,18 @@ Rails.logger.debug "this: docu count in filter method: #{documents.count} on thi
     if start_years.any? && end_years.any?
       sorted_years = [start_years.min, end_years.max].sort # Ensure proper order
       combined_range = (sorted_years.first..sorted_years.last).to_a
+      Rails.logger.debug "Combined Start-End Range: #{combined_range}"
 
       # Instead of returning `true`, return `doc` if it's in range
-      if combined_range.any? { |year| year.between?(start_year, end_year) }
-        filtered_ids << doc['id']  # Collect the document ID if it matches the range
-      end
+      next doc if combined_range.any? { |year| year.between?(start_year, end_year) }
+
+
     end
+    Rails.logger.debug "StartYear-EndYear: #{start_year} to #{end_year}"
 
     # Check if any extracted year falls within the user-specified range
-    if extracted_years.any? { |year| year.between?(start_year, end_year) }
-      filtered_ids << doc['id']  # Collect the document ID if it matches the range
-    end
+    extracted_years.any? { |year| year.between?(start_year, end_year) }
   end
-  filtered_ids  # Return the array of filtered IDs
 end
 
 
