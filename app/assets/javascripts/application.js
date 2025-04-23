@@ -24,3 +24,4 @@
 //= require_tree .
 //= require hyrax
 //= require tcd
+//= require leaflet

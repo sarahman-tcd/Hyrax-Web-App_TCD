@@ -70,6 +70,10 @@ Rails.application.routes.draw do
   #end here
 
 
+  get '/catalog/browse_location', to: 'catalog#browse_location', as: 'browse_location'
+  get '/catalog/combined_search', to: 'catalog#combined_search', as: 'combined_search'
+
+
 
   post 'catalog/save_tile_order', to: 'catalog#save_tile_order'
   get 'catalog/get_title_orders', to: 'catalog#get_title_orders'

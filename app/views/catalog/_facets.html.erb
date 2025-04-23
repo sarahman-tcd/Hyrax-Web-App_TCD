@@ -1,0 +1,30 @@
+<% # main container for facets/limits menu -%>
+<% if has_facet_values?  %>
+<div id="facets" class="facets sidenav">
+
+  <div class="top-panel-heading panel-heading">
+    <button type="button" class="facets-toggle" data-toggle="collapse" data-target="#facet-panel-collapse">
+      <span class="sr-only">Toggle facets</span>
+      <span class="icon-bar"></span>
+      <span class="icon-bar"></span>
+      <span class="icon-bar"></span>
+    </button>
+
+    <h2 class='facets-heading'>
+      <%= t('blacklight.search.facets.title') %>
+    </h2>
+  </div>
+
+  <div id="facet-panel-collapse" class="collapse panel-group">
+    <div id="publisher-location-sidebar-item" class="panel panel-default facet_limit blacklight-title_sim ">
+      <div class="collapse-toggle panel-heading collapsed" aria-expanded="false">
+        <h3 class="panel-title facet-field-heading">
+          <a data-turbolinks="false" data-no-turbolink="true" href="#">Place of Publication</a>
+        </h3>
+      </div>      
+    </div>
+    
+    <%= render_facet_partials %>
+  </div>
+</div>
+<% end %>
