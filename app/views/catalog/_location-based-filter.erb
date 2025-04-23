@@ -21,119 +21,114 @@
 
 </style>
 
-  <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
-  <script>
-function loadMap() {
-    let loadingMessage = document.getElementById("map-loading");
-    if (loadingMessage) {
-        loadingMessage.style.display = "block";
-    }
-
-    var map = L.map('map').setView([51.505, -0.09], 2);
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-    }).addTo(map);
-
-    let locations = [];
-    let locationData = {};
-    let markers = [];
-    
-    const rawParams = document.getElementById("current-search-params")?.value;
-    const searchParams = rawParams ? JSON.parse(rawParams) : {};
-    const queryString = new URLSearchParams(searchParams).toString();
-    console.log("rawParams:", rawParams);
-    console.log("queryString:", queryString);
-    console.log("searchParams:", searchParams);
-    console.log("Final URL:", `/catalog/browse_location.json?${queryString}`);
-    
-    fetch(`/catalog/browse_location.json?${queryString}`)
-    .then(response => response.json())
-    .then(data => {
-        locations = Object.entries(data.locations);
-        unidentified = data.unidentified;
-        locationData = data.location_ids;
-
-        if (unidentified && unidentified["Unidentified"]) {
-            $('#unidentified_publisher_location').text(
-                unidentified["Unidentified"].count + " unidentified publisher location(s) found."
-            );
+<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+<script>
+    function loadMap() {
+        let loadingMessage = document.getElementById("map-loading");
+        if (loadingMessage) {
+            loadingMessage.style.display = "block";
         }
 
-        var bounds = L.latLngBounds();
+        var map = L.map('map').setView([51.505, -0.09], 2);
 
-        locations.forEach(function ([locationName, details]) {
-            const { lat, lng, count } = details;
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
 
-            if (lat === undefined || lng === undefined) {
-                console.warn(`Skipping location: ${locationName} due to missing lat/lng`);
-                return;
+        let locations = [];
+        let locationData = {};
+        let markers = [];
+        
+        const rawParams = document.getElementById("current-search-params")?.value;
+        const searchParams = rawParams ? JSON.parse(rawParams) : {};
+        const queryString = new URLSearchParams(searchParams).toString();
+        console.log("rawParams:", rawParams);
+        console.log("queryString:", queryString);
+        console.log("searchParams:", searchParams);
+        console.log("Final URL:", `/catalog/browse_location.json?${queryString}`);
+        
+        fetch(`/catalog/browse_location.json?${queryString}`)
+        .then(response => response.json())
+        .then(data => {
+            locations = Object.entries(data.locations);
+            unidentified = data.unidentified;
+            locationData = data.location_ids;
+
+            if (unidentified && unidentified["Unidentified"]) {
+                $('#unidentified_publisher_location').text(
+                    unidentified["Unidentified"].count + " unidentified publisher location(s) found."
+                );
             }
 
-            var marker = L.marker([lat, lng]).addTo(map);
-            
-            // Set popup content but DO NOT open it immediately
-            let popupContent = `<b>${locationName}</b><br>Item(s): ${count}`;
-            marker.bindPopup(popupContent, { autoClose: true });
+            var bounds = L.latLngBounds();
 
-            bounds.extend([lat, lng]);
-            markers.push({ marker, locationName, count });
-        });
+            locations.forEach(function ([locationName, details]) {
+                const { lat, lng, count } = details;
 
-        map.fitBounds(bounds);
-
-        // Attach events AFTER markers are created
-        markers.forEach(({ marker, locationName, count }) => {
-            marker.on('mouseover', function(e) {
-                var popup = e.target.getPopup();
-                if (popup) {
-                    popup.setContent(`<b>${locationName}</b><br>Item(s): ${count}`);
-                    e.target.openPopup();  // ✅ Open only on hover
-                }
-            });
-
-            marker.on('mouseout', function() {
-                map.closePopup(); // ✅ Close popup when mouse leaves
-            });
-
-            marker.on('click', function() {
-                let locationIDs = locationData[locationName]?.ids || [];
-
-                if (locationIDs.length === 0) {
-                    console.log("No IDs found for location:", locationName);
+                if (lat === undefined || lng === undefined) {
+                    console.warn(`Skipping location: ${locationName} due to missing lat/lng`);
                     return;
                 }
 
-                console.log("Filtering by location:", locationName, "with IDs:", locationIDs);
+                var marker = L.marker([lat, lng]).addTo(map);
+                
+                // Set popup content but DO NOT open it immediately
+                let popupContent = `<b>${locationName}</b><br>Item(s): ${count}`;
+                marker.bindPopup(popupContent, { autoClose: true });
 
-                let searchParams = new URLSearchParams(window.location.search);
-                searchParams.set("location_filter", locationIDs.join(",")); 
-
-                window.location.href = "/catalog?" + searchParams.toString();
+                bounds.extend([lat, lng]);
+                markers.push({ marker, locationName, count });
             });
+
+            map.fitBounds(bounds);
+
+            // Attach events AFTER markers are created
+            markers.forEach(({ marker, locationName, count }) => {
+                marker.on('mouseover', function(e) {
+                    var popup = e.target.getPopup();
+                    if (popup) {
+                        popup.setContent(`<b>${locationName}</b><br>Item(s): ${count}`);
+                        e.target.openPopup();  // Open only on hover
+                    }
+                });
+
+                marker.on('mouseout', function() {
+                    map.closePopup(); // Close popup when mouse leaves
+                });
+
+                marker.on('click', function() {
+                    let locationIDs = locationData[locationName]?.ids || [];
+
+                    if (locationIDs.length === 0) {
+                        console.log("No IDs found for location:", locationName);
+                        return;
+                    }
+
+                    console.log("Filtering by location:", locationName, "with IDs:", locationIDs);
+
+                    let searchParams = new URLSearchParams(window.location.search);
+                    searchParams.set("location_filter", locationIDs.join(",")); 
+
+                    window.location.href = "/catalog?" + searchParams.toString();
+                });
+            });
+
+            if (loadingMessage) {
+                loadingMessage.style.display = "none";
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching location_latlong:', error);
+            if (loadingMessage) {
+                loadingMessage.innerText = "Sorry, no data available for this time range.";
+            }
         });
+    }
+</script>
 
-        if (loadingMessage) {
-            loadingMessage.style.display = "none";
-        }
-    })
-    .catch(error => {
-        console.error('Error fetching location_latlong:', error);
-        if (loadingMessage) {
-            loadingMessage.innerText = "Sorry, no data available for this time range.";
-        }
-    });
-}
-
-
-
-
-
-  </script>
-
-  <div id="location-filter">
-    <p id="unidentified_publisher_location"></p>
-  </div>
+<div id="location-filter">
+<p id="unidentified_publisher_location"></p>
+</div>
 
 
 

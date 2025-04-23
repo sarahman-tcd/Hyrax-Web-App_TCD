@@ -193,15 +193,22 @@ document.addEventListener("turbolinks:load", function () {
 
     `;
 
-      addButton.addEventListener("click", function() {
+    // Safe setup with a flag
+      if (!addButton.dataset.listenerAttached) {
+        addButton.addEventListener("click", function() {
           if (addCount < maxAddCount) {
-            const newLineHTML= ` <div class="query-line" id="dynamic-search-rows">` + addNewLineHTML + `</div>`;
-              dynamicContainer.insertAdjacentHTML("beforeend", newLineHTML);
-              addCount++;
+            const newLineHTML = `<div class="query-line" id="dynamic-search-rows">` + addNewLineHTML + `</div>`;
+            dynamicContainer.insertAdjacentHTML("beforeend", newLineHTML);
+            addCount++;
           } else {
-              alert("You can only add up to 10 search lines.");
+            alert("You can only add up to 10 search lines.");
           }
-      });
+        });
+
+        // Mark as attached so this block doesn't run again
+        addButton.dataset.listenerAttached = "true";
+      }
+
 
 
       dynamicContainer.addEventListener("click", function(e) {

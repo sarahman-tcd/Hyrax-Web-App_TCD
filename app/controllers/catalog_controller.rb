@@ -195,7 +195,43 @@ end
   super  # Ensure Blacklight handles default behavior
   begin   
     search_params = params.to_unsafe_h.deep_symbolize_keys  
-    search_params[:q] = params[:q].present? ? params[:q] : '*:*'
+   
+    # search_params[:q] = params[:q].present? ? params[:q] : '*:*'
+    Rails.logger.debug "this: search param: #{search_params}"
+    # Expand all_tesim: queries to cover all relevant fields
+    if params[:q].present?
+      original_q = params[:q].strip
+
+      # Check if the query is exactly "any: **" or any variant with spaces/parentheses
+      if original_q.downcase.gsub(/\s+/, '') == 'any:**' || original_q.match?(/\(?\s*any:\s*\*{2}\s*\)?/i)
+        search_params[:q] = '*:*'
+
+      # Else, look for partial any:(something) within a query and expand it
+      elsif original_q =~ /any:\(?([^)]+?)\)?/i
+        user_query = Regexp.last_match(1).strip
+        fields = %w[
+          abstract_tesim
+          contributor_tesim
+          copyright_note_tesim
+          creator_tesim
+          digital_object_identifier_tesim
+          keyword_tesim
+          publisher_tesim
+          identifier_tesim
+          subject_tesim
+          title_tesim
+        ]
+        expanded = "(#{fields.map { |f| "#{f}:(#{user_query})" }.join(' OR ')})"
+        search_params[:q] = original_q.sub(/any:\(?([^)]+?)\)?/i, expanded)
+
+      else
+        search_params[:q] = original_q
+      end
+
+    else
+      search_params[:q] = '*:*'
+    end
+
     search_params[:page] = params[:page] || 1  
     search_params[:page] = 1 if params[:location_filter].present? && params[:page].blank?
     
@@ -227,11 +263,7 @@ end
       return
     end
 
-    search_params[:rows] = if start_year && end_year && date_range_match
-      20000  # Pull more results than needed
-    else
-      params[:rows] || 10
-    end
+    search_params[:rows] = params[:rows] || 10
 
     @response, @documents = search_results(search_params)
  
@@ -253,15 +285,7 @@ end
   end
 end
 
-
-
-
-
-
-
- 
-   
- #--------Advance Search------#
+#--------Advance Search------#
  
  private
 
