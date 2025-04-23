@@ -1,5 +1,27 @@
 <div id="content" class="col-md-9 col-md-push-3 col-sm-8 col-sm-push-4">
-    <%= render 'search_results' %>
+<input type="hidden" id="current-search-params" value='<%= params.to_unsafe_h.to_json %>'>
+
+  <div id="publisher-location-map" class="hidden-map">
+    <div id="map-loading">
+      <p>Loading map, please wait...</p>
+    </div>
+    <button id="reload-map-btn" style="
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 1000;
+      padding: 6px 10px;
+      background-color: #fff;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      cursor: pointer;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+    ">
+    <i class="fa fa-refresh" aria-hidden="true"></i> 
+    </button>
+    <%= render 'location-based-filter' %>
+  </div>
+  <%= render 'search_results' %>
 </div>
 
 <div id="sidebar" class="col-md-3 col-md-pull-9 col-sm-4 col-sm-pull-8">
@@ -88,3 +110,212 @@
     fetchData();
   });
 </script>
+
+
+
+<script>  
+  document.getElementById("reload-map-btn").addEventListener("click", function () {
+      location.reload();
+  });
+  document.getElementById("publisher-location-sidebar-item").addEventListener("click", function(event) {
+    event.preventDefault();
+    let mapView = document.getElementById("publisher-location-map");
+
+    if (mapView) {
+      mapView.classList.toggle("show");
+
+      if (mapView.classList.contains("show")) {
+        mapView.style.display = "block";
+        if (!window.publisherMapInitialized) {
+          loadMap();
+          window.publisherMapInitialized = true;
+        }
+      } else {
+        setTimeout(() => mapView.style.display = "none", 300);
+      }
+    }
+  });
+</script>
+
+<script>
+  document.addEventListener("turbolinks:load", function () {
+      setTimeout(() => {
+        $('.filterName, .filterValue').each(function () {
+          const rawText = $(this).text().replace(/\s+/g, ' ').trim();
+          const anyMatch = rawText.match(/^\["any"\]\s*(.*)$/i);
+          if (anyMatch) {
+            const valueOnly = anyMatch[1].trim();
+            const className = $(this).attr('class');
+
+            if (className.includes('filterName')) {
+              $(this).text('Any');
+            } else if (className.includes('filterValue')) {
+              $(this).text(valueOnly).attr('title', valueOnly);
+            }
+          }
+        });
+      }, 500); 
+
+
+      // Find all the constraint-value spans
+      const constraintSpans = document.querySelectorAll('.constraint-value');
+
+      constraintSpans.forEach(function (span) {
+          // Get the raw query text directly from the span
+          const rawSearchParams = span.textContent.trim(); // Extract text content
+        
+          if (rawSearchParams) {
+              // Convert the raw search params to human-readable format
+              const humanReadable = humanReadableFilters(rawSearchParams);
+
+              // Find the elements where we want to update the text
+              const filterNameElement = span.querySelector('.filterName');
+              const filterValueElement = span.querySelector('.filterValue');
+
+              // Update the filter display
+              if (filterNameElement) {
+                  filterNameElement.textContent = humanReadable;
+              }
+              if (filterValueElement) {
+                  filterValueElement.setAttribute('title', humanReadable); // Update the tooltip
+                  filterValueElement.textContent = humanReadable;
+              }
+              // document.addEventListener("turbolinks:load", humanReadableFilters(rawSearchParams));
+              // document.addEventListener("ajax:success", humanReadableFilters(rawSearchParams));
+          }
+      });
+      
+      function humanReadableFilters(searchParams) {
+          const filterDescriptions = [];
+          
+          // Match field-based queries like (field_tesim:"value") or (field_tesim:*value*)
+          let matches = [...searchParams.matchAll(/\(?([^:()]+)_tesim:([*"\[]?)([^*\]"]+)([*"\]]?)\)?/g)];
+          // Match logical operators (AND, OR, NOT)
+          let operators = [...searchParams.matchAll(/\s+(AND|OR|NOT)\s+/g)].map(op => op[1]);
+
+          if (matches.length === 0) {
+              // If no structured search was detected, return the raw query (quick search case)
+              return searchParams;
+          }
+
+          matches.forEach((match, index) => {
+              let field = match[1].replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()); // Capitalize field name
+              let query = match[3];
+              let prefix = match[2], suffix = match[4];
+              let operator = "contains";
+              
+              // **Ignore "ANY" fields and just show the query**
+              if (field.toLowerCase() === "any") {
+                  filterDescriptions.push(query);
+              } 
+              // **Handle Date Created separately (handling BCE years)**
+              else if (field === "Date Created" && prefix === "[" && suffix === "]") {
+                  let dateRange = query.split("TO");
+                  if (dateRange.length === 2) {
+                      // Check for negative years and treat them as BCE
+                      dateRange = dateRange.map(year => {
+                          if (year.startsWith('-')) {
+                              return `${Math.abs(year)} BCE`;
+                          }
+                          return `${Math.abs(year)} CE`;
+                      });
+                      filterDescriptions.push(`${field} From ${dateRange[0]} To ${dateRange[1]}`);
+                  } else {
+                      // Handle single date in BCE format if present
+                      if (query.startsWith('-')) {
+                          filterDescriptions.push(`${field} ${Math.abs(query)} BCE`);
+                      } else {
+                          filterDescriptions.push(`${field} ${Math.abs(query)} CE`);
+                      }
+                  }
+              } 
+              // **Regular operator handling**
+              else {              
+                  if (prefix === '*' && suffix === '*') operator = "contains";
+                  else if (suffix === '*') operator = "starts with";
+                  else if (prefix === '"' && suffix === '"') operator = "equals";
+
+                  filterDescriptions.push(`${field} ${operator} ${query}`);
+              }
+
+              // **Only add the logical operator if there's another filter after this one**
+              if (index < matches.length - 1) {
+                  filterDescriptions.push(operators[index]);
+              }
+          });
+
+          return filterDescriptions.join(' ');
+      }
+
+
+
+
+  });
+</script>
+
+<script type="text/javascript">
+  function mergeFacets(primarySelector, secondarySelector, newClass, newLabel) {
+    const primaryPanel = document.querySelector(primarySelector);
+    const secondaryPanel = document.querySelector(secondarySelector);
+
+    if (!primaryPanel && !secondaryPanel) {
+      return;
+    }
+
+    // Check if any of the original facets were open
+    const wasOpen = (primaryPanel && primaryPanel.querySelector('.facet-content').classList.contains('in')) || 
+                    (secondaryPanel && secondaryPanel.querySelector('.facet-content').classList.contains('in'));
+
+    // Create merged panel
+    const mergedPanel = document.createElement("div");
+    mergedPanel.classList.add("panel", "panel-default", "facet_limit", newClass);
+
+    let facetList = "";
+    if (primaryPanel) {
+      facetList += primaryPanel.querySelector(".facet-values").innerHTML;
+    }
+    if (secondaryPanel) {
+      facetList += secondaryPanel.querySelector(".facet-values").innerHTML;
+    }
+
+    mergedPanel.innerHTML = `
+      <div class="collapse-toggle panel-heading" aria-expanded="${wasOpen}" data-toggle="collapse" data-target="#facet-${newClass}">
+        <h3 class="panel-title facet-field-heading">
+          <a data-turbolinks="false" data-no-turbolink="true" href="#">${newLabel}</a>
+        </h3>
+      </div>
+      <div id="facet-${newClass}" class="panel-collapse facet-content collapse ${wasOpen ? 'in' : ''}" aria-expanded="${wasOpen}">
+        <div class="panel-body">
+          <ul class="facet-values list-unstyled">
+            ${facetList}
+          </ul>
+        </div>
+      </div>
+    `;
+
+    if (primaryPanel) {
+      primaryPanel.parentNode.insertBefore(mergedPanel, primaryPanel);
+    } else if (secondaryPanel) {
+      secondaryPanel.parentNode.insertBefore(mergedPanel, secondaryPanel);
+    }
+
+    // Remove original panels
+    if (primaryPanel) primaryPanel.remove();
+    if (secondaryPanel) secondaryPanel.remove();
+  }
+
+  function applyFacetMerging() {
+    mergeFacets(".blacklight-keyword_sim", ".blacklight-subject_sim", "blacklight-keyword_subject", "Keyword/Subject");
+    mergeFacets(".blacklight-creator_sim", ".blacklight-contributor_sim", "blacklight-creator_contributor", "Creator/Contributor");
+  }
+
+  // Run on initial page load
+  document.addEventListener("DOMContentLoaded", applyFacetMerging);
+
+  // Re-run on AJAX navigation (Blacklight uses Turbolinks/AJAX)
+  document.addEventListener("turbolinks:load", applyFacetMerging);
+  document.addEventListener("ajax:success", applyFacetMerging);
+</script>
+
+
+

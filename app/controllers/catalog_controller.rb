@@ -63,16 +63,223 @@ class CatalogController < ApplicationController
       existing_data << { 'collection_id' => collection_id, 'tile_order' => tile_order }
     end
 
-    write_data(existing_data)
-    
-    render json: { message: 'Saved successfully' }
-  rescue => e
-    # If any error occurs during the process, respond with an error message
-    Rails.logger.error "Error: #{e.message}, Raised at: #{backtrace}"
-    render json: { error: e.message }, status: :unprocessable_entity
-  end
+   write_data(existing_data)
+   
+   render json: { message: 'Saved successfully' }
+ rescue => e
+   # If any error occurs during the process, respond with an error message
+   Rails.logger.error "Error: #{e.message}, Raised at: #{backtrace}"
+   render json: { error: e.message }, status: :unprocessable_entity
+ end
+ #--------Tile Order------#
 
-  private
+ #--------Browse Publisher Location Using Map------#
+def browse_location_old
+  begin
+    # Try to get search results from request body
+    all_docs = Rails.cache.read("all_search_results") || [] #params[:documents] || []
+
+    if all_docs.empty?
+      Rails.logger.warn "No stored search results found in session"
+      render json: { locations: {}, unidentified: {} } and return
+    end
+    # if all_docs.empty?
+    #   Rails.logger.error "No documents received, fallback to fresh Solr query"
+    #   search_builder.append(:add_publisher_location_filter)
+    #   all_docs = fetch_all_publisher_locations(search_builder)
+    # end
+
+    Rails.logger.debug "Total Documents Received: #{all_docs.size}"
+    Rails.logger.debug "First Document: #{all_docs.first.inspect}" if all_docs.any?
+
+    # Process the documents as before
+    @location_counts = all_docs.group_by { |doc| doc['publisher_location_tesim'].presence }.transform_values(&:count)
+
+    total_count = @location_counts.values.sum
+    Rails.logger.debug "Total count: #{total_count}"
+
+    normalized_location_counts = @location_counts.each_with_object({}) do |(location, count), result|
+      normalized_location = location.is_a?(Array) ? location.join(', ').strip : location.to_s.strip
+      result[normalized_location] ||= 0
+      result[normalized_location] += count
+    end
+
+    unidentified_count = @location_counts.delete(nil) || 0
+    @location_latlong = get_latlong_for_locations(normalized_location_counts)
+
+    Rails.logger.debug "Sending JSON Response: #{@location_latlong.to_json}"
+
+    @unidentified = { "Unidentified" => { count: unidentified_count } }
+
+    render json: { locations: @location_latlong, unidentified: @unidentified }
+  rescue => e
+    Rails.logger.error "Error: #{e.message}, Raised at: #{e.backtrace.first}"
+    render json: { error: e.message }, status: :internal_server_error
+  end
+end
+
+def browse_location
+  begin
+    search_params = params.to_unsafe_h.deep_symbolize_keys
+    search_params[:q] = params[:q].present? ? params[:q] : '*:*'
+    search_params[:page] = 1
+    search_params[:rows] = 100  # Default per page; will loop to get all
+    Rails.logger.debug "this: BL search param with date: #{search_params}"
+    # Optional: extract date range and clean it from query
+    user_input = nil
+    date_range_match = search_params[:q].match(/date_created_tesim:\[(-?\d{1,4})TO(-?\d{1,4})\]/)
+    if date_range_match
+      start_year, end_year = date_range_match.captures.map(&:to_i)
+      user_input = "#{start_year},#{end_year}"
+      search_params[:q].sub!(/AND?\s*\(?date_created_tesim:\[.*?\]\)?/, '')
+    end
+
+        Rails.logger.debug "this: BL search param without date: #{search_params}"
+
+    all_results = []
+    current_page = 1
+
+    loop do
+      search_params[:page] = current_page
+      response, docs = search_results(search_params)
+      all_results.concat(docs)
+
+      break if docs.size < search_params[:rows].to_i
+      current_page += 1
+    end
+
+    if start_year && end_year && date_range_match
+      all_results = filter_documents_by_date_range(all_results, user_input)
+    end
+
+    # Then continue your logic with `all_results`
+    normalized_location_counts = Hash.new { |hash, key| hash[key] = { count: 0, ids: [] } }
+
+    all_results.each do |doc|
+      raw_location = doc['publisher_location_tesim']&.first || "Unidentified"
+      normalized_location = raw_location.is_a?(Array) ? raw_location.join(', ').strip : raw_location.to_s.strip
+
+      normalized_location_counts[normalized_location][:count] += 1
+      normalized_location_counts[normalized_location][:ids] << doc['id']
+    end
+
+    location_counts = normalized_location_counts.transform_values { |v| v[:count] }
+    @location_latlong = get_latlong_for_locations(location_counts)
+    unidentified_count = normalized_location_counts.delete("Unidentified")&.dig(:count) || 0
+    @unidentified = { "Unidentified" => { count: unidentified_count } }
+
+    render json: {
+      locations: @location_latlong,
+      unidentified: @unidentified,
+      location_ids: normalized_location_counts
+    }
+  rescue => e
+    Rails.logger.error "Error: #{e.message}, Raised at: #{e.backtrace.first}"
+    render json: { error: e.message }, status: :internal_server_error
+  end
+end
+
+ #--------Browse Publisher Location Using Map------#
+
+ #--------Advance Search------#
+
+ def index
+  super  # Ensure Blacklight handles default behavior
+  begin   
+    search_params = params.to_unsafe_h.deep_symbolize_keys  
+   
+    # search_params[:q] = params[:q].present? ? params[:q] : '*:*'
+    Rails.logger.debug "this: search param: #{search_params}"
+    # Expand all_tesim: queries to cover all relevant fields
+    if params[:q].present?
+      original_q = params[:q].strip
+
+      # Check if the query is exactly "any: **" or any variant with spaces/parentheses
+      if original_q.downcase.gsub(/\s+/, '') == 'any:**' || original_q.match?(/\(?\s*any:\s*\*{2}\s*\)?/i)
+        search_params[:q] = '*:*'
+
+      # Else, look for partial any:(something) within a query and expand it
+      elsif original_q =~ /any:\(?([^)]+?)\)?/i
+        user_query = Regexp.last_match(1).strip
+        fields = %w[
+          abstract_tesim
+          contributor_tesim
+          copyright_note_tesim
+          creator_tesim
+          digital_object_identifier_tesim
+          keyword_tesim
+          publisher_tesim
+          identifier_tesim
+          subject_tesim
+          title_tesim
+        ]
+        expanded = "(#{fields.map { |f| "#{f}:(#{user_query})" }.join(' OR ')})"
+        search_params[:q] = original_q.sub(/any:\(?([^)]+?)\)?/i, expanded)
+
+      else
+        search_params[:q] = original_q
+      end
+
+    else
+      search_params[:q] = '*:*'
+    end
+
+    search_params[:page] = params[:page] || 1  
+    search_params[:page] = 1 if params[:location_filter].present? && params[:page].blank?
+    
+    search_params[:sort] = params[:sort] || blacklight_config.sort_fields.keys.first
+    search_params[:per_page] = params[:per_page] || 10
+
+    date_range_match = search_params[:q].match(/date_created_tesim:\[(-?\d{1,4})TO(-?\d{1,4})\]/)    
+    if date_range_match
+      start_year, end_year = date_range_match.captures.map(&:to_i)
+      search_params[:q].sub!(/AND?\s*\(?date_created_tesim:\[.*?\]\)?/, '') 
+    end   
+    Rails.logger.debug "this: search param without date: #{search_params}"
+
+    if params[:location_filter].present?
+      location_ids = params[:location_filter].split(',')
+      location_filter_query = "id:(" + location_ids.map { |id| "\"#{id.strip}\"" }.join(" OR ") + ")"
+      
+      # Combine this into the existing query
+      search_params[:q] = "#{search_params[:q]} AND #{location_filter_query}"
+      Rails.logger.debug "this: Final Search Params Sent to SearchBuilder: #{search_params.inspect}"
+      @response, @documents = search_results(search_params)
+      Rails.logger.debug "this: SOLR returned: #{@response.total} total hits, #{@documents.count} on this page"
+
+      respond_to do |format|
+        format.html { render :index }  # Normal page load
+        format.json { render json: { response: @response, documents: @documents } }  # API JSON response
+        format.js { render partial: 'catalog/search_results', formats: [:js] }  # Ensure JavaScript format is handled
+      end
+      return
+    end
+
+    search_params[:rows] = params[:rows] || 10
+
+    @response, @documents = search_results(search_params)
+ 
+    if start_year && end_year && date_range_match
+      user_input = "#{start_year},#{end_year}"
+      Rails.logger.debug "User input date range: #{user_input}"
+      @documents = filter_documents_by_date_range(@documents, user_input)
+      Rails.logger.debug "filtered_results: #{@documents.count}"
+    end
+    
+    respond_to do |format|
+      format.html { render :index }  # Normal page load
+      format.json { render json: { response: @response, documents: @documents } }  # API JSON response
+      format.js { render partial: 'catalog/search_results', formats: [:js] }  # Ensure JavaScript format is handled
+    end
+  rescue => e
+    Rails.logger.error "Error: #{e.message}, Raised at: #{e.backtrace.first}"
+    render json: { error: 'An error occurred during the search.', details: e.message }, status: :internal_server_error
+  end
+end
+
+#--------Advance Search------#
+ 
+ private
 
   def read_existing_data
     file_path = Rails.root.join('public', 'tileOrder.json')

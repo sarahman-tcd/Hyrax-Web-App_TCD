@@ -43,3 +43,730 @@
 
   </div><!-- /.form-group -->
 <% end %>
+
+
+<script>
+document.addEventListener("turbolinks:load", function () {
+
+      $('#search-field-header').removeAttr('value');
+      //Placeholder Animation
+      const searchField = document.getElementById("search-field-header");
+      
+      //const placeholderText = "Search Entire Collection";
+      let index = 0;
+      //$("#search-field-header").attr("placeholder", "");
+
+      //const intervalId = setInterval(() => {
+      //  if (index < placeholderText.length) {
+      //    searchField.placeholder += placeholderText[index];
+      //    index++;
+      //  } else {
+      //    clearInterval(intervalId);
+      //  }
+      //}, 120); 
+
+      //Search Info Tooltip
+      $('[data-toggle="tooltip"]').tooltip();
+
+      //Toggle the Advance Search Option
+      const advancedPanel = document.querySelector(".advanced-search-panel");
+      const toggleAdvancedSearch = document.getElementById("toggle-advanced-search");
+
+      const simplePanel = document.querySelector(".simple-search-panel");
+      const toggleSimpleSearch = document.getElementById("toggle-simple-search");
+      
+
+      toggleAdvancedSearch.addEventListener("click", function() {
+          $('#advance-search-option').hide();
+          simplePanel.style.display = "none";
+          advancedPanel.style.display = 'block';
+      });
+
+      toggleSimpleSearch.addEventListener("click", function() {
+          advancedPanel.style.display = 'none';
+          simplePanel.style.display = "block";
+          $('#advance-search-option').show();
+      });
+    
+
+      const addButton = document.getElementById("add-line");
+      const dynamicContainer = document.querySelector(".dynamic-queries-container");
+      let addCount = 1;
+      const maxAddCount = 10;
+
+      const addNewLineHTML = `
+        <div class="row search-row">
+          <div class="col-sm-2">
+            <select name="search_logic[]" class="form-control logic-dropdown">
+              <option value="AND">AND</option>
+              <option value="OR">OR</option>
+              <option value="NOT">NOT</option>
+            </select>
+          </div>
+          <div class="col-sm-3">
+            <select name="search_field[]" class="form-control field-dropdown">
+              <option value="any">Any Field</option>
+              <option value="abstract_tesim">Abstract</option>
+              <option value="contributor_tesim">Creator / Contributor</option>
+              <option value="copyright_note_tesim">Copyright note</option>
+              <option value="digital_object_identifier_tesim">DOI</option>
+              <option value="keyword_tesim">Keyword / Subject</option>
+              <option value="publisher_tesim">Publisher</option>
+              <option value="identifier_tesim">Shelf Mark/Reference Number</option>
+              <option value="title_tesim">Title</option>
+            </select>
+          </div>
+          <div class="col-sm-3">
+            <select name="search_operator[]" class="form-control operator-dropdown">
+              <option value="contains">Contains</option>
+              <option value="starts_with">Starts With</option>
+              <option value="equal">Equals</option>
+            </select>
+          </div>
+          <div class="col-sm-3">
+              <%= text_field_tag "search_query[]", nil, class: "q form-control", placeholder: "Search term" %>            
+
+          </div>
+          
+        <div class="col-sm-1">
+            <button type="button" class="btn btn-clear-line" style="color: #fff; background-color: #ff76762b; border: 1px solid #ff9393;">
+              <i class="fa fa-trash-o" style="font-size:20px;"></i>
+            </button>
+          </div>
+        </div>
+
+
+    `;
+
+    // Safe setup with a flag
+      if (!addButton.dataset.listenerAttached) {
+        addButton.addEventListener("click", function() {
+          if (addCount < maxAddCount) {
+            const newLineHTML = `<div class="query-line" id="dynamic-search-rows">` + addNewLineHTML + `</div>`;
+            dynamicContainer.insertAdjacentHTML("beforeend", newLineHTML);
+            addCount++;
+          } else {
+            alert("You can only add up to 10 search lines.");
+          }
+        });
+
+        // Mark as attached so this block doesn't run again
+        addButton.dataset.listenerAttached = "true";
+      }
+
+
+
+      dynamicContainer.addEventListener("click", function(e) {
+          const removeButton = e.target.closest(".btn-clear-line");
+          if (removeButton) {
+              const queryLine = removeButton.closest(".query-line");
+              if (queryLine) {
+                  queryLine.remove();
+                  if (addCount > 0) addCount--;
+              }
+          }
+      });
+
+
+      const canvas = document.getElementById("timeline-canvas");
+      const ctx = canvas.getContext("2d");
+
+      const minYear = -2500;
+      const maxYear = new Date().getFullYear();
+      const initialStartYear = -1153;
+      const initialEndYear = 1147;
+
+      // Initialize pointers at the middle range
+      const startPointer = {
+          x: ((initialStartYear - minYear) / (maxYear - minYear)) * canvas.width,
+          y: 25,
+          label: initialStartYear < 0 ? Math.abs(initialStartYear) + " BCE" : initialStartYear+ " CE",
+      };
+    
+      const endPointer = {
+          x: ((initialEndYear - minYear) / (maxYear - minYear)) * canvas.width,
+          y: 25,
+          label: initialEndYear < 0 ? Math.abs(initialEndYear) + " BCE" : initialEndYear + " CE",
+      };
+
+      function updateYearLabels() {
+          const startPercent = startPointer.x / canvas.width;
+          const endPercent = endPointer.x / canvas.width;
+
+          // Calculate the start and end year based on the pointer positions
+          const startYear = Math.round(startPercent * (maxYear - minYear) + minYear);
+          const endYear = Math.round(endPercent * (maxYear - minYear) + minYear);
+
+          // Function to format the year as BCE or CE
+          function formatYear(year) {
+              if (year <= 0) {
+                  return Math.abs(year) + " BCE";  // Display BCE for negative years
+              } else {
+                  return year + " CE";  // Display CE for positive years
+              }
+          }
+
+          // Update the labels to show the formatted years
+          startPointer.label = formatYear(startYear);
+          endPointer.label = formatYear(endYear);
+      }
+
+
+      function drawSlider() {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+          // Draw timeline background for the entire slider
+          const radius = 6; // Adjust this value for more or less rounding
+
+          ctx.fillStyle = "#fff"; // Background color outside the range
+          
+          // Draw rounded rectangle manually
+          ctx.beginPath();
+          ctx.moveTo(radius, startPointer.y - 5); // Start from the left rounded corner
+          ctx.lineTo(canvas.width - radius, startPointer.y - 5); // Top edge
+          ctx.arc(canvas.width - radius, startPointer.y + 1, radius, Math.PI * 1.5, Math.PI * 0.5, false); // Right rounded edge
+          ctx.lineTo(radius, startPointer.y + 7); // Bottom edge
+          ctx.arc(radius, startPointer.y + 1, radius, Math.PI * 0.5, Math.PI * 1.5, false); // Left rounded edge
+          ctx.closePath();
+          ctx.fill();
+          
+
+          // Draw timeline background for the selected range
+          ctx.fillStyle = "#7ac1f5"; // Highlight color for the range
+          ctx.fillRect(startPointer.x, startPointer.y - 5, endPointer.x - startPointer.x, 12);
+
+          // Draw start pointer
+          ctx.fillStyle = "#1074b7";
+          ctx.beginPath();
+          ctx.arc(startPointer.x, startPointer.y, 10, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Draw end pointer
+          ctx.beginPath();
+          ctx.arc(endPointer.x, endPointer.y, 10, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Draw labels
+          ctx.fillStyle = "#fff";
+          ctx.font = "bolder 14px Arial";
+
+          const textPadding = 5; // Padding to prevent edge clipping
+          const minLabelSpacing = 20; // Minimum distance between labels
+
+          // Measure text widths
+          const textWidthStart = ctx.measureText(startPointer.label).width;
+          const textWidthEnd = ctx.measureText(endPointer.label).width;
+
+          // Default positions
+          let startX = startPointer.x - textWidthStart / 2;
+          let endX = endPointer.x - textWidthEnd / 2;
+
+          // Prevent labels from going outside the div
+          if (startX < textPadding) startX = textPadding;
+          if (startX + textWidthStart > canvas.width - textPadding) startX = canvas.width - textWidthStart - textPadding;
+
+          if (endX < textPadding) endX = textPadding;
+          if (endX + textWidthEnd > canvas.width - textPadding) endX = canvas.width - textWidthEnd - textPadding;
+
+          // **Avoid Overlapping Labels**
+          if (endX < startX + textWidthStart + minLabelSpacing) {
+              let overlapAdjustment = (startX + textWidthStart + minLabelSpacing) - endX;
+              endX += overlapAdjustment / 2;
+              startX -= overlapAdjustment / 2;
+          }
+
+          // Draw text after adjustments
+          ctx.fillText(startPointer.label, startX, startPointer.y - 15);
+          ctx.fillText(endPointer.label, endX, endPointer.y - 15);
+
+
+      }
+
+
+      function dragPointer(e, pointer) {
+          const rect = canvas.getBoundingClientRect();
+          const minLeft = 0;
+          const maxLeft = canvas.width;
+
+          function onMouseMove(event) {
+              let newX = event.clientX - rect.left;
+              newX = Math.min(Math.max(newX, minLeft), maxLeft);
+
+              if (pointer === startPointer) {
+                  const endX = endPointer.x;
+                  if (newX >= endX) {
+                      newX = endX - 1;
+                  }
+              } else {
+                  const startX = startPointer.x;
+                  if (newX <= startX) {
+                      newX = startX + 1;
+                  }
+              }
+
+              pointer.x = newX;
+              updateYearLabels();
+              drawSlider();
+          }
+
+          function onMouseUp() {
+              document.removeEventListener("mousemove", onMouseMove);
+              document.removeEventListener("mouseup", onMouseUp);
+          }
+
+          document.addEventListener("mousemove", onMouseMove);
+          document.addEventListener("mouseup", onMouseUp);
+      }
+
+      canvas.addEventListener("mousedown", function(e) {
+          const distStart = Math.abs(e.clientX - canvas.getBoundingClientRect().left - startPointer.x);
+          const distEnd = Math.abs(e.clientX - canvas.getBoundingClientRect().left - endPointer.x);
+
+          if (distStart < distEnd) {
+              dragPointer(e, startPointer);
+          } else {
+              dragPointer(e, endPointer);
+          }
+      });
+
+      // Initial setup
+      updateYearLabels();
+      drawSlider();
+
+      const searchButton = document.getElementById('search-button');
+      const rowsContainer = document.getElementById('dynamic-search-rows');
+
+      function restoreSearchFields() {
+        const savedSearchFields = localStorage.getItem("savedSearchFields");
+        const savedPanelState = localStorage.getItem("advancedPanelState");
+        const savedTimeRange = localStorage.getItem("savedTimeRange");
+    
+        // Restore search fields values
+        if (savedSearchFields) {
+            const searchFieldsData = JSON.parse(savedSearchFields);
+            const dynamicContainer = document.getElementById("dynamic-search-rows");
+    
+            // Ensure we have enough rows
+            while (document.querySelectorAll(".search-row").length < searchFieldsData.length) {
+                addSearchRow(); // Add new row dynamically
+            }
+    
+            document.querySelectorAll(".search-row").forEach((row, index) => {
+                if (searchFieldsData[index]) {
+                    const fieldData = searchFieldsData[index];
+    
+                    // Check for logic dropdown (skip for the first row)
+                    const logicDropdown = row.querySelector(".logic-dropdown");
+                    if (logicDropdown) {
+                        logicDropdown.value = fieldData.logic;
+                    }
+    
+                    const fieldDropdown = row.querySelector(".field-dropdown");
+                    if (fieldDropdown) {
+                        fieldDropdown.value = fieldData.field;
+                    }
+    
+                    const operatorDropdown = row.querySelector(".operator-dropdown");
+                    if (operatorDropdown) {
+                        operatorDropdown.value = fieldData.operator;
+                    }
+    
+                    const queryInput = row.querySelector(".q");
+                    if (queryInput) {
+                        queryInput.value = fieldData.query;
+                    }
+                }
+            });
+        }
+    
+        // Restore Advanced Search Panel visibility
+        if (savedPanelState === "open") {
+            advancedPanel.style.display = "block";
+            simplePanel.style.display = "none";
+            document.getElementById("advance-search-option").style.display = "none";
+        }
+    
+        // Restore time slider values
+        if (savedTimeRange) {
+            const [startYear, endYear] = JSON.parse(savedTimeRange);
+            startPointer.label = startYear;
+            endPointer.label = endYear;
+    
+            // Update the pointers based on saved values
+            startPointer.x = ((startYear - minYear) / (maxYear - minYear)) * canvas.width;
+            endPointer.x = ((endYear - minYear) / (maxYear - minYear)) * canvas.width;
+    
+            // Update labels and redraw the slider
+            updateYearLabels();
+            drawSlider();
+        }
+    }
+    
+    // Function to extract the correct year value from the label
+    function extractYearFromLabel(label) {
+        let year = parseInt(label);  // Extract the numeric part of the label
+
+        if (label.includes("BCE")) {
+            return -Math.abs(year);  // If BCE, return a negative year
+        } else if (label.includes("CE")) {
+            return Math.abs(year);  // If CE, return the positive year
+        }
+        
+        return year;  // In case of no label, return the year as it is
+    }
+
+    function addSearchRow() {
+      const dynamicContainer = document.getElementById("dynamic-search-rows");
+
+      
+
+      if (addCount < maxAddCount) {
+        const newLineHTML= ` <div class="query-line" id="dynamic-search-rows" style="margin-top:15px"">` + addNewLineHTML + `</div>`;
+            
+
+          // Append to container
+          dynamicContainer.insertAdjacentHTML("beforeend", newLineHTML);
+          addCount++;
+
+          // Hide logic dropdown for the first row
+          const allRows = dynamicContainer.querySelectorAll(".search-row");
+          if (allRows.length === 1) {
+              allRows[0].querySelector(".logic-dropdown").style.display = "none";
+          }
+
+          // Add event listener for the remove button
+          const removeButtons = document.querySelectorAll(".remove-btn");
+          removeButtons.forEach(button => {
+              button.onclick = function () {
+                  this.closest(".search-row").remove();
+                  addCount--;
+              };
+          });
+      } else {
+          alert("You can only add up to 10 search lines.");
+      }
+   }
+
+
+    function saveSearchFields() {
+      const searchFieldsData = [];
+  
+      document.querySelectorAll(".search-row").forEach((row) => {
+          const logic = row.querySelector(".logic-dropdown") ? row.querySelector(".logic-dropdown").value : '';
+          const field = row.querySelector(".field-dropdown").value;
+          const operator = row.querySelector(".operator-dropdown").value;
+          const query = row.querySelector(".q").value;
+  
+          searchFieldsData.push({ logic, field, operator, query });
+      });
+  
+      // Save search fields data
+      localStorage.setItem("savedSearchFields", JSON.stringify(searchFieldsData));
+  
+      // Save time range values
+      const startPointerLabel= extractYearFromLabel(startPointer.label);
+      const endPointerLabel= extractYearFromLabel(endPointer.label);
+      const savedTimeRange = JSON.stringify([startPointerLabel, endPointerLabel]);
+      localStorage.setItem("savedTimeRange", savedTimeRange);
+  
+      // Save advanced panel state
+      localStorage.setItem("advancedPanelState", advancedPanel.style.display === "block" ? "open" : "closed");
+    }
+  
+  
+
+    
+
+    function getSearchParams() {
+      let combinedQuery = '';
+      
+      document.querySelectorAll(".search-row").forEach((row, index) => {
+          let logic = row.querySelector(".logic-dropdown") ? row.querySelector(".logic-dropdown").value : ''; 
+          let field = row.querySelector(".field-dropdown").value;
+          let operator = row.querySelector(".operator-dropdown").value;
+          let query = row.querySelector(".q").value.trim();
+  
+          // Apply correct formatting based on the operator
+          query = query.includes(' ') ? `"${query}"` : query;
+          if (operator === 'contains') {
+              query = `*${query}*`;
+          } else if (operator === 'starts_with') {
+              query = `${query}*`;
+          } else if (operator === 'equal') {
+              query = `"${query}"`;
+          }
+  
+          let queryPart = `(${field}:${query})`;
+  
+          // Special handling for combined facets
+          if (field === "contributor_tesim") {
+              queryPart = `(contributor_tesim:${query}) OR (creator_tesim:${query})`;
+          } else if (field === "keyword_tesim") {
+              queryPart = `(keyword_tesim:${query}) OR (subject_tesim:${query})`;
+          }
+  
+          // Append logic only from the second row onward
+          if (index > 0 && logic) {
+              combinedQuery += ` ${logic} `;
+          }
+  
+          combinedQuery += queryPart;
+      });
+  
+      // Fetch time range values from the timeline slider
+      const startYear = extractYearFromLabel(startPointer.label);
+      const endYear = extractYearFromLabel(endPointer.label);
+  
+      if (combinedQuery) {
+          combinedQuery += " AND ";
+      }
+  
+      // Append time range filter to query
+      combinedQuery += `(date_created_tesim:[${startYear}TO${endYear}])`;
+  
+      return new URLSearchParams({ q: combinedQuery }).toString();
+  }
+  
+  
+
+  
+
+    // Advance search button click
+    searchButton.addEventListener('click', function(event) {
+        event.preventDefault();
+        saveSearchFields();
+        let searchParams = getSearchParams();
+        let currentPath = window.location.pathname;
+        
+        if (currentPath !== "/catalog") {
+            restoreSearchFields();
+            // Redirect to /catalog but keep input values
+            let newUrl = "/catalog?" + searchParams;
+            history.pushState(null, "", newUrl);
+            window.location.href = newUrl;
+        } else {
+            restoreSearchFields();
+            // If already on /catalog, update the URL and reload without full refresh
+            let newUrl = "/catalog?" + searchParams;
+            history.pushState(null, "", newUrl);
+            window.location.assign(newUrl);            
+        }
+    });
+
+
+    // Keep search fields populated after page load
+    function restoreSearchFields_old() {
+        let params = new URLSearchParams(window.location.search);
+        let query = params.get('q');
+
+        if (query) {
+            let conditions = query.split(/ (AND|OR) /); // Splitting query by logic operators
+
+            document.querySelectorAll(".search-row").forEach((row, index) => {
+                if (conditions[index]) {
+                    let match = conditions[index].match(/\((.*?):(.*?)\)/);
+                    if (match) {
+                        let field = match[1];
+                        let queryValue = match[2];
+
+                        row.querySelector(".field-dropdown").value = field;
+                        row.querySelector(".q").value = queryValue.replace(/\*/g, ''); // Remove wildcards
+                    }
+                }
+            });
+        }
+    }
+
+    restoreSearchFields(); // Restore fields when page loads
+
+    // Preserve search results when using back/forward navigation
+    window.addEventListener("popstate", function() {
+        restoreSearchFields();
+        location.reload(); // Reload but keep input values
+    });
+
+    // Clear All button event
+    const clearAllButton = document.getElementById("clear-all");
+
+    clearAllButton.addEventListener("click", function() {
+        // Clear all saved data from localStorage
+        localStorage.removeItem("savedSearchFields");
+        localStorage.removeItem("savedTimeRange");
+        localStorage.removeItem("advancedPanelState");
+
+        // Optionally clear the search fields (if needed)
+        document.querySelectorAll(".search-row").forEach((row) => {
+            //row.querySelector(".logic-dropdown").value = 'AND'; // or reset to default value
+            row.querySelector(".field-dropdown").value = 'any'; // or reset to default field
+            row.querySelector(".operator-dropdown").value = 'contains'; // or reset to default operator
+            row.querySelector(".q").value = ''; // reset search input
+        });
+
+        // Clear the time slider to the default state
+        startPointer.label = initialStartYear;
+        endPointer.label = initialEndYear;
+        startPointer.x = ((initialStartYear - minYear) / (maxYear - minYear)) * canvas.width;
+        endPointer.x = ((initialEndYear - minYear) / (maxYear - minYear)) * canvas.width;
+        updateYearLabels();
+        drawSlider();
+
+        // Reset the panel to the simple view
+        advancedPanel.style.display = 'none';
+        simplePanel.style.display = 'block';
+        document.getElementById("advance-search-option").style.display = 'block';
+
+        // Refresh the page to reset everything
+        const url = clearAllButton.getAttribute("data-redirect-url");
+        if (url) {
+          window.location.href = url;
+        }
+    });
+
+   
+
+
+  });
+
+</script>
+
+
+<style>
+  .advanced-search-panel {
+    padding: 10px;
+    margin-top: 10px;
+    border-radius: 4px;
+  }
+  .dynamic-queries-container {
+    margin-bottom: 10px;
+  }
+  .query-line .row {
+    margin-bottom: 15px;
+  }
+  .q-line-static  {
+    margin-bottom: 15px;
+  }
+  .timeline-bar {
+    position: relative;
+    margin-top: 10px;
+  }
+  .full-width-search {
+    display: flex;
+  }
+  .full-width-search .form-control {
+    flex-grow: 1;
+    border-radius: 15px;
+  }
+
+  .full-width-search .btn-primary {
+    padding: 0;
+    border: none;
+    background-color: transparent;
+  }
+
+  .full-width-search .btn-primary:hover {
+    background-color: #f0f0f0;
+  }
+
+  .full-width-search .btn-primary i {
+    font-size: 20px;
+  }
+  .full-width-search .input-group-append {
+    width: 40px;
+    height: 38px;
+  }
+  .fancy-label {
+    font-size: 36px; 
+    font-weight: bold;
+    color: #ffffff;
+    text-align: center;
+    margin-bottom: 20px;
+    animation: fadeInUp 1s ease-in-out;
+  }
+
+  @keyframes fadeInUp {
+    0% {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .search-button {
+    size:large;
+    background-color: transparent;
+    border: none;
+    padding-left: 10px;
+  }
+  .search-button i {
+    font-size: 24px; 
+  }
+
+  .search-button:hover {
+    cursor: pointer;
+  }
+  #search-field-header {
+  border-radius: 15px;
+  }
+  .clickable-label {
+    background-color: transparent;
+    border: none;
+    color: #fff;
+    padding-top: 2px;
+    padding-left: 2px;
+    cursor: pointer;
+    font-weight: bolder;
+    text-decoration: underline;
+  }
+
+  .clickable-label:hover {
+    color: #00c2ff;
+    text-decoration: underline;
+  }
+
+  .clickable-add-option {
+    background-color: transparent;
+    padding-top: 2px;
+    padding-left: 2px;
+    cursor: pointer;
+    font-weight: bolder;
+    color:#81c4f3;
+  }
+
+  .clickable-add-option:hover {
+    color: #00c2ff;
+  }
+
+  .clickable-clear-option {
+    background-color: transparent;
+    padding-top: 2px;
+    padding-left: 2px;
+    cursor: pointer;
+    font-weight: bolder;
+    color:#ff9393;
+  }
+
+  .clickable-clear-option:hover {
+    color: red;
+  }
+  .advance-search-button {
+    color:#fff; 
+    background-color: #00a1ff26; 
+    border: 1px solid #81caff;
+  }
+  .advance-search-button:hover {
+    color:#fff; 
+    background-color: #00a1ff63; 
+    border: 1px solid #81caff ;
+  }
+
+  #timeline-canvas {
+    width: 100%;         
+    height: auto;        
+    display: block;      
+    max-width: 100%;    
+    padding-right: 15px;
+    padding-left: 15px;
+</style>
