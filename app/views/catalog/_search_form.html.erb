@@ -1,47 +1,102 @@
 <%= form_tag search_form_action, method: :get, class: "form-horizontal search-form", id: "search-form-header", role: "search" do %>
-  <%= render_hash_as_hidden_fields(search_state.params_for_search.except(:q, :search_field, :qt, :page, :utf8)) %>
-  <%= hidden_field_tag :search_field, 'all_fields' %>
   <div class="form-group">
-
-    <label class="control-label col-sm-3" for="search-field-header">
-      <%= t(:'hyrax.search.button.text') %>
-    </label>
-
-    <div class="input-group">
-      <%= text_field_tag :q, current_search_parameters , class: "q form-control", id: "search-field-header", placeholder: t("hyrax.search.form.q.placeholder") %>
-
-      <div class="input-group-btn">
-        <button type="submit" class="btn btn-primary" id="search-submit-header">
-          <%= t('hyrax.search.button.html') %>
+    <h1 class="fancy-label">Explore Digital Collections</h1>
+    <div class="form-group simple-search-panel">
+      <div class="input-group full-width-search " >
+        <div style="position: relative; display: inline-block; width: 100%;">
+          <%= text_field_tag :q, current_search_parameters, class: "q form-control", id: "search-field-header", placeholder: "Search Entire Collection" %>
+          
+          <i class="fa fa-info-circle" data-toggle="tooltip" title="Please avoid using special characters (e.g., @, #, $, %, &, -, +, *)"
+            style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #6a6a6a8f; z-index: 100;font-size: large;"></i>
+        </div>
+        <button type="submit" class="search-button" id="search-submit-header" data-toggle="tooltip" title="Search">
+          <i class="fa fa-search"></i>
         </button>
-        <% if current_user %>
-          <button class="btn btn-default dropdown-toggle" type="button" data-toggle="dropdown" aria-expanded="false">
+      </div>
+    </div>
+  </div>
 
-            <span class="sr-only" data-search-element="label"><%= t("hyrax.search.form.option.all.label_long", application_name: application_name) %></span>
-            <span aria-hidden="true"><%= t("hyrax.search.form.option.all.label_short") %></span>
-            <span class="caret"></span>
-          </button>
+ 
 
-          <ul class="dropdown-menu pull-right">
-            <li>
-              <%= link_to t("hyrax.search.form.option.all.label_long", application_name: application_name), "#",
-                  data: { "search-option" => main_app.search_catalog_path, "search-label" => t("hyrax.search.form.option.all.label_short") } %>
-            </li>
-            <li>
-              <%= link_to t("hyrax.search.form.option.my_works.label_long"), "#",
-                  data: { "search-option" => hyrax.my_works_path, "search-label" => t("hyrax.search.form.option.my_works.label_short") } %>
-            </li>
-            <li>
-              <%= link_to t("hyrax.search.form.option.my_collections.label_long"), "#",
-                  data: { "search-option" => hyrax.my_collections_path, "search-label" => t("hyrax.search.form.option.my_collections.label_short") } %>
-            </li>
-          <% end %>
+   <div class="advanced-search-panel" style="display: none;">
+      <div class="dynamic-queries-container">
+        <div class="q-line-static " id="dynamic-search-rows">
+          <div class="row search-row">
+            <div class="form-group" style="padding-right:15px; padding-left:15px ">
+              <label>Creation Date</label><br>
+              <canvas id="timeline-canvas" width="885" height="50" style="padding-right:5px; padding-left:0px "></canvas>
+            </div>
 
-        </ul>
-      </div><!-- /.input-group-btn -->
-    </div><!-- /.input-group -->
+            <br><br>
+        
+            <div class="col-sm-3">
+            <select name="search_field[]" class="form-control field-dropdown">
+            <option value="any">Any Field</option>
+            <option value="abstract_tesim">Abstract</option>
+            <option value="contributor_tesim">Creator / Contributor</option>
+            <option value="copyright_note_tesim">Copyright note</option>
+            <option value="digital_object_identifier_tesim">DOI</option>
+            <option value="keyword_tesim">Keyword / Subject</option>
+            <option value="publisher_tesim">Publisher</option>
+            <option value="identifier_tesim">Shelf Mark/Reference Number</option>
+            <option value="title_tesim">Title</option>
+              </select>
+            </div>
+            <div class="col-sm-3">
+              <select name="search_operator[]" class="form-control operator-dropdown">
+                <option value="contains">Contains</option>
+                <option value="starts_with">Starts With</option>
+                <option value="equal">Equals</option>
+              </select>
+            </div>
+            <div class="col-sm-6">
+              <%= text_field_tag "search_query[]", nil, class: "q form-control", placeholder: "Search term" %>            
+            </div>
+          </div>
+        </div>
+      </div>
 
-  </div><!-- /.form-group -->
+      <div class="form-group" >
+        <label  id="add-line"  class="btn clickable-add-option"><i class="fa fa-plus"></i> Add New Search</label>  
+        <label id="clear-all"
+              class="btn clickable-clear-option"
+              data-redirect-url="<%= main_app.search_catalog_path(f: { human_readable_type_sim: ["Collection"]}) %>">
+          <i class="fa fa-refresh"></i> Clear All
+        </label>
+      </div>
+      
+      <br>
+
+      <div class="advanced-search-filters">     
+      
+        
+        <div class="row">
+          <div class="col-sm-6"> 
+            <div class="form-group" style="text-align: left;" >
+              <label for="toggle-simple-search" style="padding-bottom: 20px;">Go back to</label>
+              <button type="button" id="toggle-simple-search"  class="btn clickable-label">Quick Search</button>
+            </div>
+          </div> 
+
+          <div class="col-sm-6">
+            <div class="form-group" style="text-align: right;" >
+              <button type="submit" class="btn advance-search-button btn-primary"  id="search-button" style="">
+                <i class="fa fa-search"></i> Search
+              </button>
+            </div> 
+          </div>
+
+        </div> 
+      
+      </div>  
+    </div>   
+
+
+  
+  <div class="form-group simple-search-panel" id="advance-search-option">
+    <label for="toggle-advanced-search" style="padding-bottom: 20px;">Discover more with</label>
+    <button type="button" id="toggle-advanced-search"  class="btn clickable-label">Advanced Search</button>
+  </div>
 <% end %>
 
 

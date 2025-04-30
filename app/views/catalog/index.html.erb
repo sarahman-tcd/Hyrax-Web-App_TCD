@@ -29,6 +29,25 @@
 </div>
 
 
+<style>
+#publisher-location-map {
+  display: none;
+  opacity: 0;
+  transform: scale(0.95);
+  transition: opacity 0.5s ease-out, transform 0.3s ease-out, background-color 0.5s ease-out;
+}
+
+#publisher-location-map.show {
+  opacity: 1;
+  transform: scale(1);
+  background-color: white;
+}
+.search-result-wrapper:hover {
+  background-color: #f0f0f0; /* Change to your preferred hover color */
+  transition: background-color 0.3s ease-in-out;
+  cursor: pointer;
+}
+</style>
 
 <script> 
   $(document).on('click', '.tileOrderContainer', function(event) {
@@ -316,6 +335,5 @@
   document.addEventListener("turbolinks:load", applyFacetMerging);
   document.addEventListener("ajax:success", applyFacetMerging);
 </script>
-
 
 
