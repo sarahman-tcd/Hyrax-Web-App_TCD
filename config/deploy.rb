@@ -9,7 +9,7 @@ set :repo_url, "https://github.com/sarahman-tcd/Hyrax-Web-App_TCD.git"
 set :passenger_restart_with_touch, true
 
 # Default branch is :master
-ask :branch, `git rev-parse --abbrev-ref master`.chomp
+set :branch, ENV['BRANCH'] || 'master'
 
 # Default deploy_to directory is /var/www/my_app_name
 set :deploy_to, "/var/www/TCD-Hyrax-Web-App"
