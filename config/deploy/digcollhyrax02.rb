@@ -1,6 +1,6 @@
 set :stage, :digcollhyrax02
 set :rails_env, :digcollhyrax02
-set :branch, "master"
+set :branch, "sr_live"
 # Default deploy_to directory is /var/www/my_app_name. Override it:
 set :deploy_to, "/opt/app/TCD-Hyrax-Web-App"
 set :rvm_ruby_version, '2.5.1'
