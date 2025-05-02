@@ -1,6 +1,6 @@
 set :stage, :dcdevhyrax
 set :rails_env, :dcdevhyrax
-set :branch, "master"
+set :branch, "sr_dev"
 
 #set :branch, "2022-04-04-Maps-Hyrax-Rights-Statement-In-MarcXML"
 
