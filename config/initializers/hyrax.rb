@@ -234,6 +234,8 @@ Hyrax.config do |config|
   config.upload_path = ->() { '/opt/app/hyrax/tmp/uploads/' }
   config.cache_path = ->() { '/opt/app/hyrax/tmp/uploads/cache/' }
 
+  config.feature_config_path = Rails.root.join('config', 'features.yml')
+
   # Location on local file system where derivatives will be stored
   # If you use a multi-server architecture, this MUST be a shared volume
   config.derivatives_path = Rails.root.join('tmp', 'derivatives')
