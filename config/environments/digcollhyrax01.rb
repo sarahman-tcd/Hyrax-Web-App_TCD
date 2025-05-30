@@ -55,6 +55,11 @@ Rails.application.configure do
   #  config.cache_store = :null_store
   #end
 
+  # AR: Use redis for caching
+  config.action_controller.perform_caching = true
+  config.cache_store = :redis_store, "redis://localhost:6379/0/cache"
+  config.middleware.insert_before ActionDispatch::Static, NoCacheMiddleware, [/concern\/.*\/.*\/edit/, /concern\/.*\/.*\/new/, /dashboard\/.*\/.*\/edit/, /uploaded_collection_thumbnails/]
+
   config.action_mailer.raise_delivery_errors = true
   config.action_mailer.perform_deliveries = true
   config.action_mailer.perform_caching = false
