@@ -765,8 +765,8 @@ GEM
     redic (1.5.3)
       hiredis
     redis (4.5.1)
-    redis-actionpack (5.5.0)
-      actionpack (>= 5)
+    redis-actionpack (5.4.0)
+      actionpack (>= 5, < 8)
       redis-rack (>= 2.1.0, < 4)
       redis-store (>= 1.1.0, < 2)
     redis-activesupport (5.3.0)
@@ -1001,6 +1001,7 @@ DEPENDENCIES
   prawn
   puma (~> 4.3)
   rails (~> 5.1.6.2)
+  redis-actionpack (= 5.4.0)
   redis-rails
   rest-client
   riiif

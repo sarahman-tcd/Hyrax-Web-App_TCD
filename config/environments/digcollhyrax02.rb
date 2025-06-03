@@ -95,6 +95,8 @@ Rails.application.configure do
     # JL : 2020-02-10 : IIIF_SERVER_URL='http://digcoll-web02.tcd.ie/iiif/2/'
   #IIIF_SERVER_URL='/iiif/2/'
   IIIF_SERVER_URL='https://digitalcollections.tcd.ie/iiif/2/'
+  ENV['EXTERNAL_IIIF_URL']='https://digitalcollections.tcd.ie/iiif/2/'
+
   #IIIF_SERVER_URL='http://127.0.0.1:8080/cantaloupe-4.1.2/iiif/2/'
 
   # JL : TODO. Check if I need this. Added it because viewer giving errors on VM-099
