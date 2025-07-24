@@ -53,7 +53,11 @@ Rails.application.configure do
   #
   #  config.cache_store = :null_store
   #end
+
+  # AR: Use redis for caching
   config.action_controller.perform_caching = true
+  config.cache_store = :redis_store, "redis://localhost:6379/0/cache"
+  config.middleware.insert_before ActionDispatch::Static, NoCacheMiddleware, [/concern\/.*\/.*\/edit/, /concern\/.*\/.*\/new/, /dashboard\/.*\/.*\/edit/, /uploaded_collection_thumbnails/]
 
   # Don't care if the mailer can't send.
   config.action_mailer.raise_delivery_errors = false
@@ -91,6 +95,8 @@ Rails.application.configure do
     # JL : 2020-02-10 : IIIF_SERVER_URL='http://digcoll-web02.tcd.ie/iiif/2/'
   #IIIF_SERVER_URL='/iiif/2/'
   IIIF_SERVER_URL='https://digitalcollections.tcd.ie/iiif/2/'
+  ENV['EXTERNAL_IIIF_URL']='https://digitalcollections.tcd.ie/iiif/2/'
+
   #IIIF_SERVER_URL='http://127.0.0.1:8080/cantaloupe-4.1.2/iiif/2/'
 
   # JL : TODO. Check if I need this. Added it because viewer giving errors on VM-099
@@ -105,5 +111,4 @@ Rails.application.configure do
 
   # JL: For Devise account locking
   Rails.application.routes.default_url_options[:host] = 'http://digcoll-hyrax02.tcd.ie'
-
 end

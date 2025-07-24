@@ -147,3 +147,7 @@ gem 'rest-client'
 gem 'rtesseract'
 
 gem 'multipart-post'
+
+gem 'redis-rails'
+
+gem 'redis-actionpack', '5.4.0'

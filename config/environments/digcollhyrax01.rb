@@ -55,6 +55,11 @@ Rails.application.configure do
   #  config.cache_store = :null_store
   #end
 
+  # AR: Use redis for caching
+  config.action_controller.perform_caching = true
+  config.cache_store = :redis_store, "redis://localhost:6379/0/cache"
+  config.middleware.insert_before ActionDispatch::Static, NoCacheMiddleware, [/concern\/.*\/.*\/edit/, /concern\/.*\/.*\/new/, /dashboard\/.*\/.*\/edit/, /uploaded_collection_thumbnails/]
+
   config.action_mailer.raise_delivery_errors = true
   config.action_mailer.perform_deliveries = true
   config.action_mailer.perform_caching = false
@@ -99,7 +104,9 @@ Rails.application.configure do
   # JL : 07/02/2020: IIIF_SERVER_URL='http://digcoll-imgsrv01.tcd.ie:8182/iiif/2/'
   # JL : 2020-02-10 : IIIF_SERVER_URL='http://digcoll-web01.tcd.ie/iiif/2/'
   #IIIF_SERVER_URL='/iiif/2/'
-  IIIF_SERVER_URL='https://digitalcollections.tcd.ie/iiif/2/'
+  IIIF_SERVER_URL='https://digitalcollections.tcd.ieiiif/2/'
+  ENV['EXTERNAL_IIIF_URL']='https://digitalcollections.tcd.ie/iiif/2/'
+
   #IIIF_SERVER_URL='http://127.0.0.1:8080/cantaloupe-4.1.2/iiif/2/'
 
   # JL : TODO. Check if I need this. Added it because viewer giving errors on VM-099
