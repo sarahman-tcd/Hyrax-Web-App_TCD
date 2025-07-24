@@ -3,7 +3,8 @@
 <% end %>
 
 <p><%= link_to("Add New Folder Number/Project ID", new_folder_number_path, :class => 'action new') %></p>
-<p><a href="/folder_numbers/export">Export New Folder Number/Project ID data to a file</a></p>
+<p><%= link_to "Export New Folder Number/Project ID data", folder_numbers_exportCSV_path(format: :csv) %></p>
+
 <div class="table-responsive">
   <table class="table table-striped datatable">
     <thead>
