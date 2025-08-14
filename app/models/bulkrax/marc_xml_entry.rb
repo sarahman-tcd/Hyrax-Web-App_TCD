@@ -186,10 +186,15 @@ module Bulkrax
         license_nodes.each do |lic|
           code_f = lic.xpath(".//*[local-name()='subfield'][@code='f']").text.strip
           if !code_f.empty?
+            # Store the license value directly - this maintains compatibility with the license service
             self.parsed_metadata['license'] << code_f
           end
         end
       end
+      
+      # If no licenses were found, ensure we have an empty array (not nil)
+      # This prevents issues with the license service
+      self.parsed_metadata['license'] = [] if self.parsed_metadata['license'].nil?
     end
 
     def add_genres

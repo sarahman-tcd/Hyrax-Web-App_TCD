@@ -65,28 +65,31 @@
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-  const licenseLinks = document.querySelectorAll("dd a[href='https://creativecommons.org/licenses/by/4.0/']");
+  const licenseLinks = document.querySelectorAll("dd a");
 
   licenseLinks.forEach(function (link) {
     const dd = link.closest("dd");
     const dt = dd ? dd.previousElementSibling : null;
 
     if (dt && dt.tagName === "DT" && dt.textContent.trim() === "License") {
-      // Change link text to 'CC-BY'
-      link.textContent = "CC-BY";
+      const hrefMatch = link.getAttribute("href") === "https://creativecommons.org/licenses/by/4.0/";
+      const textMatch = link.textContent.trim().includes("CC-BY");
 
-      // Add Creative Commons logo
-      const ccLogo = document.createElement("img");
-      ccLogo.src = "https://licensebuttons.net/l/by/4.0/88x31.png";
-      ccLogo.alt = "Creative Commons BY";
-      ccLogo.style.marginLeft = "0.5em";
-      ccLogo.style.marginBottom = "0.2em";
+      if (hrefMatch || textMatch) {
+        // Change link text to 'CC-BY'
+        link.textContent = "CC-BY";
+        // Add Creative Commons logo
+        const ccLogo = document.createElement("img");
+        ccLogo.src = "https://licensebuttons.net/l/by/4.0/88x31.png";
+        ccLogo.alt = "Creative Commons BY";
+        ccLogo.style.marginLeft = "0.5em";
+        ccLogo.style.marginBottom = "0.2em";
 
-      link.parentNode.insertBefore(ccLogo, link.nextSibling);
+        link.parentNode.insertBefore(ccLogo, link.nextSibling);
+      }
     }
   });
 });
-
 
 
 </script>
