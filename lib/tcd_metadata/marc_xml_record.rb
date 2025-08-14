@@ -5,15 +5,22 @@ module TcdMetadata
       @id = id
       @source = source
       @marcxml = Nokogiri::XML(source)
-      #byebug
-      #@elements = @all_marcxml.xpath("//*[name()='record']")
-      #@elements.each do | elem |
-      #  #byebug
-      #  if elem.to_s.include? "#{id}</controlfield>"
-      #    @marcxml = elem
-      #  end
-      #end
-
+      
+      # Find the specific record that matches our ID
+      @elements = @marcxml.xpath("//*[local-name()='record']")
+      @elements.each do |elem|
+        # Look for the controlfield with tag="001" that contains our ID
+        controlfield_001 = elem.xpath(".//*[local-name()='controlfield'][@tag='001']").first
+        if controlfield_001 && controlfield_001.text.strip == id
+          @marcxml = elem
+          break
+        end
+      end
+      
+      # If we didn't find the record, raise an error
+      if @marcxml.xpath("//*[local-name()='controlfield'][@tag='001']").empty?
+        raise StandardError, "Record with ID '#{id}' not found in XML source"
+      end
     end
 
     attr_reader :id, :source

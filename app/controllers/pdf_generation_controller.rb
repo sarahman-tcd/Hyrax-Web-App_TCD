@@ -60,11 +60,29 @@ class PdfGenerationController < ApplicationController
         title = work_data['title_tesim'].present? ? work_data['title_tesim'].first : 'No title available'
         shelf_mark = work_data['identifier_tesim'].present? ? work_data['identifier_tesim'].first : 'No shelf mark available'
         doi = work_data['doi_tesim'].present? ? work_data['doi_tesim'].first : 'No DOI available'
-        date_created = work_data['date_created_tesim'].present? ? work_data['date_created_tesim'].first : 'No date created available'        
+        date_created = work_data['date_created_tesim'].present? ? work_data['date_created_tesim'].first : 'No date available'  
+        
+        license = work_data['license_tesim'].present? ? work_data['license_tesim'].first : 'Not available'  
+        copyright_note = work_data['copyright_note_tesim'].present? ? work_data['copyright_note_tesim'].first : 'No copyright note available'  
+        rights_statement = work_data['rights_statement_tesim'].present? ? work_data['rights_statement_tesim'].first : 'No rights statement available'  
+        
+        
          # Check if creator and contributor is present, is an array, and not empty
-        creator = work_data['creator_tesim'].present? && work_data['creator_tesim'].is_a?(Array) && !work_data['creator_tesim'].empty? ? work_data['creator_tesim'] : ['Not specified']        
-        contributor = work_data['contributor_tesim'].present? && work_data['contributor_tesim'].is_a?(Array) && !work_data['contributor_tesim'].empty? ? work_data['contributor_tesim'] : ['Not specified']
-          
+        creator = if work_data['creator_tesim'].present? && work_data['creator_tesim'].is_a?(Array) && !work_data['creator_tesim'].empty?
+             work_data['creator_tesim'].first(5)
+          else
+             ['Not specified']
+          end
+
+        contributor = if work_data['contributor_tesim'].present? && work_data['contributor_tesim'].is_a?(Array) && !work_data['contributor_tesim'].empty?
+                 work_data['contributor_tesim'].first(5)
+              else
+                 ['Not specified']
+              end
+
+        copyright_status = work_data['copyright_status_tesim'].present? && work_data['copyright_status_tesim'].is_a?(Array) && !work_data['copyright_status_tesim'].empty? ? work_data['copyright_status_tesim'] : ['Not specified']        
+       
+
         folder_numbers = work_data['folder_number_tesim']
         file_set_ids = work_data['file_set_ids_ssim']
         flag=0
@@ -162,7 +180,7 @@ class PdfGenerationController < ApplicationController
             response.headers['Content-Disposition'] = "attachment; filename=\"#{work_id}.pdf\""           
 
             # Call the method to generate and download the PDF
-            generate_and_download_pdf(paths, work_id, title, shelf_mark, doi, creator, contributor, date_created, ocr_checkbox_val )
+            generate_and_download_pdf(paths, work_id, title, shelf_mark, doi, creator, contributor, date_created, ocr_checkbox_val, license, copyright_note, copyright_status, rights_statement )
           else
             # Handle the case where image names could not be retrieved
             Rails.logger.error "Error: Image names could not be retrieved from Solr"
@@ -178,13 +196,13 @@ class PdfGenerationController < ApplicationController
       end
     end   
     
-    def generate_and_download_pdf(paths, file_set_id, title, shelf_mark, doi, creator, contributor, date_created, ocr_checkbox_val)
+    def generate_and_download_pdf(paths, file_set_id, title, shelf_mark, doi, creator, contributor, date_created, ocr_checkbox_val, license, copyright_note, copyright_status, rights_statement)
       begin
         # Create a new PDF document
         pdf = Prawn::Document.new
     
         # Add a title page
-        add_title_page(pdf, title, shelf_mark, doi, creator, contributor, date_created, '/opt/app/TCD-Hyrax-Web-App/tcd-logo-2x.png') 
+        add_title_page(pdf, title, shelf_mark, doi, creator, contributor, date_created, '/opt/app/TCD-Hyrax-Web-App/tcd-logo-2x.png', license, copyright_note, copyright_status, rights_statement) 
         pdf.start_new_page
         
         # Initialize a flag to check if any images have been added
@@ -300,7 +318,7 @@ class PdfGenerationController < ApplicationController
   
     private
   
-   def add_title_page(pdf, title, shelf_mark, doi, creator, contributor, date_created, logo_path)
+   def add_title_page(pdf, title, shelf_mark, doi, creator, contributor, date_created, logo_path, license, copyright_note, copyright_status, rights_statement)
       # Add a UTF-8 compatible font family (Open Sans in this case)
       pdf.font_families.update("OpenSans" => {
         normal: "app/assets/fonts/OpenSans-Regular.ttf",
@@ -339,6 +357,44 @@ class PdfGenerationController < ApplicationController
       # Add Contributor(s)
       pdf.text "Contributor", style: :bold
       contributor.each { |c| pdf.text "#{c}" }
+      pdf.move_down 10
+
+      # Add license
+      if license.include?("https://creativecommons.org/licenses/by/4.0/")
+        pdf.text "License", style: :bold
+
+        # Embed 'CC-BY' as a hyperlink in PDF
+        pdf.formatted_text [
+          {
+            text: "CC-BY",
+            styles: [:underline],
+            color: "0000FF",
+            link: "https://creativecommons.org/licenses/by/4.0/"
+          }
+        ]
+
+        pdf.move_down 10
+      else
+        # Default behavior if license is not CC-BY
+        pdf.text "License", style: :bold
+        pdf.text license.to_s
+        pdf.move_down 10
+      end
+
+
+      # Add copyright_note
+      pdf.text "Copyright Note", style: :bold
+      pdf.text "#{copyright_note}"
+      pdf.move_down 10      
+
+      # Add Copyright status(s)
+      pdf.text "Copyright Status", style: :bold
+      copyright_status.each { |c| pdf.text "#{c}" }
+      pdf.move_down 10
+
+      # Add rights_statement
+      pdf.text "Rights Statement", style: :bold
+      pdf.text "#{rights_statement}"
       pdf.move_down 10
 
       # Add Date Created

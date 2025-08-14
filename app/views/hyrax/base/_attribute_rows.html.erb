@@ -9,15 +9,20 @@
 <%= presenter.attribute_to_html(:creator, render_as: :faceted, html_dl: true) %>
 <%= presenter.attribute_to_html(:contributor, render_as: :faceted, html_dl: true) %>
 <%= presenter.attribute_to_html(:doi, html_dl: true) %>
+
+<%= presenter.attribute_to_html(:license, render_as: :external_link, html_dl: true) %>
+<%= presenter.attribute_to_html(:copyright_note, html_dl: true) %>
+<%= presenter.attribute_to_html(:copyright_status, html_dl: true) %>
+<%= presenter.attribute_to_html(:rights_statement, render_as: :rights_statement, html_dl: true) %>
+
 <!-- Marker just before the button -->
 <span id="TCDdots"></span>
 
 <!-- The Collapsible metadata -->
 <span id="TCDmore">
-<%= presenter.attribute_to_html(:rights_statement, render_as: :rights_statement, html_dl: true) %>
-<%= presenter.attribute_to_html(:copyright_note, html_dl: true) %>
-<%= presenter.attribute_to_html(:copyright_status, html_dl: true) %>
-<%= presenter.attribute_to_html(:license, render_as: :external_link, html_dl: true) %>
+
+
+
 <%= presenter.attribute_to_html(:publisher_location, html_dl: true) %>
 <%= presenter.attribute_to_html(:publisher, render_as: :faceted, html_dl: true) %>
 <%= presenter.attribute_to_html(:date_created, label: t('hyrax.base.show.date_created'), html_dl: true) %>
@@ -55,12 +60,34 @@
 <!--  presenter.attribute_to_html(:based_near_label, html_dl: true)  -->
 
 
-
-
-
-
-
-
-
 </span>
 <button onclick="TCDCollapsibleFunction()" id="TCDMoreBtn">Read more</button>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const licenseLinks = document.querySelectorAll("dd a[href='https://creativecommons.org/licenses/by/4.0/']");
+
+  licenseLinks.forEach(function (link) {
+    const dd = link.closest("dd");
+    const dt = dd ? dd.previousElementSibling : null;
+
+    if (dt && dt.tagName === "DT" && dt.textContent.trim() === "License") {
+      // Change link text to 'CC-BY'
+      link.textContent = "CC-BY";
+
+      // Add Creative Commons logo
+      const ccLogo = document.createElement("img");
+      ccLogo.src = "https://licensebuttons.net/l/by/4.0/88x31.png";
+      ccLogo.alt = "Creative Commons BY";
+      ccLogo.style.marginLeft = "0.5em";
+      ccLogo.style.marginBottom = "0.2em";
+
+      link.parentNode.insertBefore(ccLogo, link.nextSibling);
+    }
+  });
+});
+
+
+
+</script>
+

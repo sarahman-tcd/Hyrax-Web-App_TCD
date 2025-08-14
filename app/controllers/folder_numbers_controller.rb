@@ -79,6 +79,37 @@ class FolderNumbersController < ApplicationController
     #redirect_back(fallback_location: root_path)
   end
 
+  def exportCSV
+    @folder_numbers = FolderNumber.all
+
+    headers = [
+      "Folder Number / Project ID",
+      "Root Filename",
+      "Title",
+      "Job Type"
+    ]
+
+    csv_data = CSV.generate(headers: true) do |csv|
+      csv << headers
+      @folder_numbers.each do |folder|
+        csv << [
+          folder.project_id,
+          folder.root_filename,
+          folder.title,
+          folder.job_type
+        ]
+      end
+    end
+
+    respond_to do |format|
+      format.csv do
+        send_data csv_data,
+                  filename: "FolderNumbers_#{Date.today}.csv",
+                  type: 'text/csv'
+      end
+    end
+  end
+
  private
 
   def folder_number_params

@@ -143,7 +143,11 @@ Bulkrax.setup do |config|
     'title' => { from: ['title'], parsed: true },
     'identifier' => { from: ['identifier'] },
     'description' => { from: ['abstract'], parsed: true },
-    'abstract' => { from: ['abstract'] }
+    'abstract' => { from: ['abstract'] },
+    'rights_statement' => { from: ['rights_statements'], parsed: true },
+    'copyright_status' => { from: ['copyright_status'], parsed: true },
+    'copyright_note' => { from: ['copyright_notes'], parsed: true },
+    'license' => { from: ['license'], parsed: true }
   }
 
   config.field_mappings['Bulkrax::ModsParser'] = {

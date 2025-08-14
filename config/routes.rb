@@ -63,6 +63,8 @@ Rails.application.routes.draw do
 
   # get 'pdf_generation/check_pdf_file_exists/:file_set_id', to: 'pdf_generation#check_pdf_file_exists', constraints: AboutParamsConstraint.new
   # # End
+  get 'folder_numbers/exportCSV', to: 'folder_numbers#exportCSV', defaults: { format: 'csv' }
+
 
   constraints IIIFParamsConstraint.new do
     get '/iiif/2/*path', to: 'riiif/images#show', format: false
