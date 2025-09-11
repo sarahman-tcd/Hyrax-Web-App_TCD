@@ -1,0 +1,46 @@
+<%# Custom rights_statement field with dropdown and fallback to text input %>
+<% begin %>
+  <% rights_statement_service = Hyrax.config.rights_statement_service_class.new %>
+  
+  <% 
+    # Smart lookup: determine what value to use for the dropdown
+    current_value = f.object.rights_statement.first if f.object.rights_statement.present?
+    selected_value = nil
+    
+    if current_value
+      # Check if this is a term or ID and find the corresponding ID for the dropdown
+      rights_file = Rails.root.join('config', 'authorities', 'rights_statements.yml')
+      if File.exist?(rights_file)
+        rights_data = YAML.load_file(rights_file)
+        rights_data['terms'].each do |term_data|
+          # Check if this is a term match
+          if term_data['term'] == current_value
+            selected_value = term_data['id']
+            break
+          end
+          # Check if this is an ID match
+          if term_data['id'] == current_value
+            selected_value = term_data['id']
+            break
+          end
+        end
+      end
+      
+      # If no match found, use the original value
+      selected_value = current_value if selected_value.nil?
+    end
+  %>
+  
+  <%= f.input :rights_statement, as: :select,
+      collection: rights_statement_service.select_active_options,
+      include_blank: true,
+      selected: selected_value,
+      input_html: { class: 'form-control' },
+      required: f.object.required?(:rights_statement) %>
+<% rescue => e %>
+  <%# Fallback to simple text input if rights statement service fails %>
+  <%= f.input :rights_statement, as: :multi_value, 
+      input_html: { class: 'form-control' },
+      required: f.object.required?(:rights_statement) %>
+<% end %>
+

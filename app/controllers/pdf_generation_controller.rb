@@ -372,8 +372,8 @@ class PdfGenerationController < ApplicationController
       if license.present?
         pdf.text "License", style: :bold
         
-        # Simple, safe check for CC-BY licenses without relying on external services
-        if license.to_s.downcase.include?("cc-by") || license.to_s.include?("https://creativecommons.org/licenses/by/4.0/")
+        # Check for existing CC-BY logic first (preserve existing behavior)
+        if license.to_s.downcase.include?("cc-by") || license.to_s.include?("https://creativecommons.org/licenses/by/4.0/") || license.to_s.downcase.include?("creative commons by attribution 4.0 international")
           # Embed 'CC-BY' as a hyperlink in PDF
           pdf.formatted_text [
             {
@@ -384,7 +384,44 @@ class PdfGenerationController < ApplicationController
             }
           ]
         else
-          pdf.text license.to_s
+          # Smart lookup for other licenses
+          begin
+            licenses_file = Rails.root.join('config', 'authorities', 'licenses.yml')
+            if File.exist?(licenses_file)
+              licenses_data = YAML.load_file(licenses_file)
+              license_match = nil
+              
+              # Check if this is a term or ID match
+              licenses_data['terms'].each do |term_data|
+                if term_data['term'] == license.to_s || term_data['id'] == license.to_s
+                  license_match = term_data
+                  break
+                end
+              end
+              
+              if license_match && license_match['id'].start_with?('http://', 'https://')
+                # URL ID: show term as clickable link
+                pdf.formatted_text [
+                  {
+                    text: license_match['term'],
+                    styles: [:underline],
+                    color: "0000FF",
+                    link: license_match['id']
+                  }
+                ]
+              else
+                # Text ID or no match: show as plain text
+                pdf.text license.to_s
+              end
+            else
+              # Fallback to plain text if YAML file not found
+              pdf.text license.to_s
+            end
+          rescue => e
+            # Fallback to plain text if any error occurs
+            Rails.logger.warn "License lookup failed: #{e.message}"
+            pdf.text license.to_s
+          end
         end
         pdf.move_down 10
       end
@@ -406,7 +443,45 @@ class PdfGenerationController < ApplicationController
       # Add rights_statement only if present and meaningful
       if rights_statement.present?
         pdf.text "Rights Statement", style: :bold
-        pdf.text "#{rights_statement}"
+        
+        # Smart lookup for rights statement
+        begin
+          rights_file = Rails.root.join('config', 'authorities', 'rights_statements.yml')
+          if File.exist?(rights_file)
+            rights_data = YAML.load_file(rights_file)
+            rights_match = nil
+            
+            # Check if this is a term or ID match
+            rights_data['terms'].each do |term_data|
+              if term_data['term'] == rights_statement.to_s || term_data['id'] == rights_statement.to_s
+                rights_match = term_data
+                break
+              end
+            end
+            
+            if rights_match && rights_match['id'].start_with?('http://', 'https://')
+              # URL ID: show term as clickable link
+              pdf.formatted_text [
+                {
+                  text: rights_match['term'],
+                  styles: [:underline],
+                  color: "0000FF",
+                  link: rights_match['id']
+                }
+              ]
+            else
+              # Text ID or no match: show as plain text
+              pdf.text rights_statement.to_s
+            end
+          else
+            # Fallback to plain text if YAML file not found
+            pdf.text rights_statement.to_s
+          end
+        rescue => e
+          # Fallback to plain text if any error occurs
+          Rails.logger.warn "Rights statement lookup failed: #{e.message}"
+          pdf.text rights_statement.to_s
+        end
         pdf.move_down 10
       end
 
@@ -430,7 +505,7 @@ class PdfGenerationController < ApplicationController
     end
 
     def resize_image(image_data)
-      image = MiniMagick::Image.read(image_data)
+      image = MiniMagick::Image.read(image_data) 
     
       # Get the original dimensions
       original_width = image[:width]

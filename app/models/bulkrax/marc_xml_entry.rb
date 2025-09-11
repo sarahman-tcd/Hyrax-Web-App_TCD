@@ -4,6 +4,13 @@ require 'nokogiri'
 module Bulkrax
   # Generic XML Entry
   class MarcXmlEntry < Entry
+    include Bulkrax::HasLocalProcessing
+
+    def initialize(attributes = {})
+      Rails.logger.debug "DEBUG: MarcXmlEntry initialize called with attributes: #{attributes.inspect}"
+      super
+    end
+
     serialize :raw_metadata, JSON
 
     def self.fields_from_data(data); end
@@ -49,6 +56,7 @@ module Bulkrax
     end
 
     def build_metadata
+      Rails.logger.debug "DEBUG: build_metadata method called in MarcXmlEntry"
       raise StandardError, 'Record not found' if record.nil?
       raise StandardError, 'Missing source identifier' if source_identifier.blank?
       self.parsed_metadata = {}
@@ -136,13 +144,16 @@ module Bulkrax
         rights_nodes.each do |stmt|
           code_f = stmt.xpath(".//*[local-name()='subfield'][@code='f']").text.strip
           if !code_f.empty?
-            self.parsed_metadata['rights_statement'] << code_f
+            # Map the MARC XML value to rights statement dropdown option (exact match only)
+            mapped_rights = map_rights_statement_to_dropdown(code_f)
+            self.parsed_metadata['rights_statement'] << mapped_rights
           end
         end
       end
       
-      # If no rights statement was found, add the default
-      if self.parsed_metadata['rights_statement'].empty?
+      # Only set default during actual import operations
+      # Check if we're actually importing by looking for source_identifier
+      if self.parsed_metadata['rights_statement'].empty? && source_identifier.present?
         self.parsed_metadata['rights_statement'] << "Copyright The Board of Trinity College Dublin. Images are available for single-use academic application only. Publication, transmission or display is prohibited without formal written approval of the Library of Trinity College, Dublin."
       end
     end
@@ -186,8 +197,9 @@ module Bulkrax
         license_nodes.each do |lic|
           code_f = lic.xpath(".//*[local-name()='subfield'][@code='f']").text.strip
           if !code_f.empty?
-            # Store the license value directly - this maintains compatibility with the license service
-            self.parsed_metadata['license'] << code_f
+            # Map the MARC XML value to license dropdown option (exact match only)
+            mapped_license = map_license_to_dropdown(code_f)
+            self.parsed_metadata['license'] << mapped_license
           end
         end
       end
@@ -195,6 +207,101 @@ module Bulkrax
       # If no licenses were found, ensure we have an empty array (not nil)
       # This prevents issues with the license service
       self.parsed_metadata['license'] = [] if self.parsed_metadata['license'].nil?
+    end
+
+    def collections_created?
+      return true if importerexporter.parser_fields['parent_id'].blank?
+      return true unless find_or_create_collection_ids.blank?
+    end
+
+    def find_or_create_collection_ids
+      self.collection_ids = [parent.id] if parent?
+      collection_ids
+    rescue StandardError
+      []
+    end
+
+    def parent?
+      !parent.blank?
+    end
+
+    def parent
+      @parent ||= ActiveFedora::Base.find(importerexporter.parser_fields['parent_id'])
+    rescue StandardError
+      nil
+    end
+
+    def parent_attributes
+      @parent_attributes ||= parent.attributes if parent?
+    end
+
+    def parent_collection?
+      parent.is_a?(Collection)
+    end
+
+    def factory_class
+      importerexporter.parser_fields['object_type'].constantize
+    end
+
+    private
+
+    def map_license_to_dropdown(marc_value)
+      # Load the active license terms from the YAML file
+      licenses_file = Rails.root.join('config', 'authorities', 'licenses.yml')
+      return marc_value unless File.exist?(licenses_file)
+      
+      licenses_data = YAML.load_file(licenses_file)
+      active_licenses = licenses_data['terms'].select { |term| term['active'] }
+      
+      # Find exact match by comparing the MARC value with license terms
+      marc_value_downcase = marc_value.downcase.strip
+      
+      active_licenses.each do |license|
+        term_downcase = license['term'].downcase.strip
+        id = license['id']
+        
+        # Exact term match only
+        if marc_value_downcase == term_downcase
+          return id
+        end
+      end
+      
+      # If no exact match found, return the original value
+      marc_value
+    end
+
+    def map_rights_statement_to_dropdown(marc_value)
+      # Load the active rights statement terms from the YAML file
+      rights_file = Rails.root.join('config', 'authorities', 'rights_statements.yml')
+      return marc_value unless File.exist?(rights_file)
+      
+      rights_data = YAML.load_file(rights_file)
+      active_rights = rights_data['terms'].select { |term| term['active'] }
+      
+      # Debug: Log what we're looking for
+      Rails.logger.debug "debug: MARC XML rights statement value: '#{marc_value}'"
+      Rails.logger.debug "debug: Available active rights terms: #{active_rights.map { |r| r['term'] }}"
+      
+      # Find exact match by comparing the MARC value with rights statement terms
+      marc_value_downcase = marc_value.downcase.strip
+      
+      active_rights.each do |rights|
+        term_downcase = rights['term'].downcase.strip
+        id = rights['id']
+        
+        # Debug: Log each comparison
+        Rails.logger.debug "debug:Comparing: '#{marc_value_downcase}' with '#{term_downcase}' -> ID: '#{id}'"
+        
+        # Exact term match only
+        if marc_value_downcase == term_downcase
+          Rails.logger.debug "debug: MATCH FOUND! Returning ID: '#{id}'"
+          return id
+        end
+      end
+      
+      Rails.logger.debug "debug: No match found, returning original value: '#{marc_value}'"
+      # If no exact match found, return the original value
+      marc_value
     end
 
     def add_genres
@@ -578,40 +685,6 @@ module Bulkrax
           self.parsed_metadata['sub_fond'] << code_t
         end
       end
-    end
-
-    def collections_created?
-      return true if importerexporter.parser_fields['parent_id'].blank?
-      return true unless find_or_create_collection_ids.blank?
-    end
-
-    def find_or_create_collection_ids
-      self.collection_ids = [parent.id] if parent?
-      collection_ids
-    rescue StandardError
-      []
-    end
-
-    def parent?
-      !parent.blank?
-    end
-
-    def parent
-      @parent ||= ActiveFedora::Base.find(importerexporter.parser_fields['parent_id'])
-    rescue StandardError
-      nil
-    end
-
-    def parent_attributes
-      @parent_attributes ||= parent.attributes if parent?
-    end
-
-    def parent_collection?
-      parent.is_a?(Collection)
-    end
-
-    def factory_class
-      importerexporter.parser_fields['object_type'].constantize
     end
 
   end
