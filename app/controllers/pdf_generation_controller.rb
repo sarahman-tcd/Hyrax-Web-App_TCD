@@ -57,14 +57,32 @@ class PdfGenerationController < ApplicationController
         work_data = work_response['response']['docs'][0]        
     
         # Extract relevant data from Solr response
-        title = work_data['title_tesim'].present? ? work_data['title_tesim'].first : 'No title available'
-        shelf_mark = work_data['identifier_tesim'].present? ? work_data['identifier_tesim'].first : 'No shelf mark available'
-        doi = work_data['doi_tesim'].present? ? work_data['doi_tesim'].first : 'No DOI available'
-        date_created = work_data['date_created_tesim'].present? ? work_data['date_created_tesim'].first : 'No date created available'        
+        title = work_data['title_tesim'].present? ? work_data['title_tesim'].first : 'Untitled'
+        shelf_mark = work_data['identifier_tesim'].present? ? work_data['identifier_tesim'].first : nil
+        doi = work_data['doi_tesim'].present? ? work_data['doi_tesim'].first : nil
+        date_created = work_data['date_created_tesim'].present? ? work_data['date_created_tesim'].first : nil
+        
+        license = work_data['license_tesim'].present? ? work_data['license_tesim'].first : nil
+        copyright_note = work_data['copyright_note_tesim'].present? ? work_data['copyright_note_tesim'].first : nil
+        rights_statement = work_data['rights_statement_tesim'].present? ? work_data['rights_statement_tesim'].first : nil
+        
+        
          # Check if creator and contributor is present, is an array, and not empty
-        creator = work_data['creator_tesim'].present? && work_data['creator_tesim'].is_a?(Array) && !work_data['creator_tesim'].empty? ? work_data['creator_tesim'] : ['Not specified']        
-        contributor = work_data['contributor_tesim'].present? && work_data['contributor_tesim'].is_a?(Array) && !work_data['contributor_tesim'].empty? ? work_data['contributor_tesim'] : ['Not specified']
-          
+        creator = if work_data['creator_tesim'].present? && work_data['creator_tesim'].is_a?(Array) && !work_data['creator_tesim'].empty?
+             work_data['creator_tesim'].first(5)
+          else
+             nil
+          end
+
+        contributor = if work_data['contributor_tesim'].present? && work_data['contributor_tesim'].is_a?(Array) && !work_data['contributor_tesim'].empty?
+                 work_data['contributor_tesim'].first(5)
+              else
+                 nil
+              end
+
+        copyright_status = work_data['copyright_status_tesim'].present? && work_data['copyright_status_tesim'].is_a?(Array) && !work_data['copyright_status_tesim'].empty? ? work_data['copyright_status_tesim'] : nil
+       
+
         folder_numbers = work_data['folder_number_tesim']
         file_set_ids = work_data['file_set_ids_ssim']
         flag=0
@@ -162,7 +180,7 @@ class PdfGenerationController < ApplicationController
             response.headers['Content-Disposition'] = "attachment; filename=\"#{work_id}.pdf\""           
 
             # Call the method to generate and download the PDF
-            generate_and_download_pdf(paths, work_id, title, shelf_mark, doi, creator, contributor, date_created, ocr_checkbox_val )
+            generate_and_download_pdf(paths, work_id, title, shelf_mark, doi, creator, contributor, date_created, ocr_checkbox_val, license, copyright_note, copyright_status, rights_statement )
           else
             # Handle the case where image names could not be retrieved
             Rails.logger.error "Error: Image names could not be retrieved from Solr"
@@ -178,13 +196,13 @@ class PdfGenerationController < ApplicationController
       end
     end   
     
-    def generate_and_download_pdf(paths, file_set_id, title, shelf_mark, doi, creator, contributor, date_created, ocr_checkbox_val)
+    def generate_and_download_pdf(paths, file_set_id, title, shelf_mark, doi, creator, contributor, date_created, ocr_checkbox_val, license, copyright_note, copyright_status, rights_statement)
       begin
         # Create a new PDF document
         pdf = Prawn::Document.new
     
         # Add a title page
-        add_title_page(pdf, title, shelf_mark, doi, creator, contributor, date_created, '/opt/app/TCD-Hyrax-Web-App/tcd-logo-2x.png') 
+        add_title_page(pdf, title, shelf_mark, doi, creator, contributor, date_created, '/opt/app/TCD-Hyrax-Web-App/tcd-logo-2x.png', license, copyright_note, copyright_status, rights_statement) 
         pdf.start_new_page
         
         # Initialize a flag to check if any images have been added
@@ -300,7 +318,7 @@ class PdfGenerationController < ApplicationController
   
     private
   
-   def add_title_page(pdf, title, shelf_mark, doi, creator, contributor, date_created, logo_path)
+   def add_title_page(pdf, title, shelf_mark, doi, creator, contributor, date_created, logo_path, license, copyright_note, copyright_status, rights_statement)
       # Add a UTF-8 compatible font family (Open Sans in this case)
       pdf.font_families.update("OpenSans" => {
         normal: "app/assets/fonts/OpenSans-Regular.ttf",
@@ -315,36 +333,164 @@ class PdfGenerationController < ApplicationController
       pdf.image logo_path, position: :left, width: 232, height: 62      
       pdf.move_down 22 # Adjust as needed
 
-      # Add the title
+      # Add the title (always include as it's required)
       pdf.font_size 14
       pdf.text title, style: :bold
       pdf.move_down 10
 
       pdf.font_size 12
-      # Add Shelf Mark/Reference Number
-      pdf.text "Shelf Mark/Reference Number", style: :bold
-      pdf.text "#{shelf_mark}"
-      pdf.move_down 10
+      
+      # Add Shelf Mark/Reference Number only if present
+      if shelf_mark.present?
+        pdf.text "Shelf Mark/Reference Number", style: :bold
+        pdf.text "#{shelf_mark}"
+        pdf.move_down 10
+      end
 
-      # Add DOI
-      pdf.text "DOI", style: :bold
-      pdf.text "#{doi}"
-      pdf.move_down 10
+      # Add DOI only if present
+      if doi.present?
+        pdf.text "DOI", style: :bold
+        pdf.text "#{doi}"
+        pdf.move_down 10
+      end
 
-      # Add Creator(s)
-      pdf.text "Creator", style: :bold
-      creator.each { |c| pdf.text "#{c}" }
-      pdf.move_down 10
+      # Add Creator(s) only if present and meaningful
+      if creator.present? && creator.any? { |c| c.present? }
+        pdf.text "Creator", style: :bold
+        creator.each { |c| pdf.text "#{c}" if c.present? }
+        pdf.move_down 10
+      end
 
-      # Add Contributor(s)
-      pdf.text "Contributor", style: :bold
-      contributor.each { |c| pdf.text "#{c}" }
-      pdf.move_down 10
+      # Add Contributor(s) only if present and meaningful
+      if contributor.present? && contributor.any? { |c| c.present? }
+        pdf.text "Contributor", style: :bold
+        contributor.each { |c| pdf.text "#{c}" if c.present? }
+        pdf.move_down 10
+      end
 
-      # Add Date Created
-      pdf.text "Date", style: :bold
-      pdf.text "#{date_created}"
-      pdf.move_down 10          
+      # Add license only if present and meaningful
+      if license.present?
+        pdf.text "License", style: :bold
+        
+        # Check for existing CC-BY logic first (preserve existing behavior)
+        if license.to_s.downcase.include?("cc-by") || license.to_s.include?("https://creativecommons.org/licenses/by/4.0/") || license.to_s.downcase.include?("creative commons by attribution 4.0 international")
+          # Embed 'CC-BY' as a hyperlink in PDF
+          pdf.formatted_text [
+            {
+              text: "CC-BY",
+              styles: [:underline],
+              color: "0000FF",
+              link: "https://creativecommons.org/licenses/by/4.0/"
+            }
+          ]
+        else
+          # Smart lookup for other licenses
+          begin
+            licenses_file = Rails.root.join('config', 'authorities', 'licenses.yml')
+            if File.exist?(licenses_file)
+              licenses_data = YAML.load_file(licenses_file)
+              license_match = nil
+              
+              # Check if this is a term or ID match
+              licenses_data['terms'].each do |term_data|
+                if term_data['term'] == license.to_s || term_data['id'] == license.to_s
+                  license_match = term_data
+                  break
+                end
+              end
+              
+              if license_match && license_match['id'].start_with?('http://', 'https://')
+                # URL ID: show term as clickable link
+                pdf.formatted_text [
+                  {
+                    text: license_match['term'],
+                    styles: [:underline],
+                    color: "0000FF",
+                    link: license_match['id']
+                  }
+                ]
+              else
+                # Text ID or no match: show as plain text
+                pdf.text license.to_s
+              end
+            else
+              # Fallback to plain text if YAML file not found
+              pdf.text license.to_s
+            end
+          rescue => e
+            # Fallback to plain text if any error occurs
+            Rails.logger.warn "License lookup failed: #{e.message}"
+            pdf.text license.to_s
+          end
+        end
+        pdf.move_down 10
+      end
+
+      # Add copyright_note only if present and meaningful
+      if copyright_note.present?
+        pdf.text "Copyright Note", style: :bold
+        pdf.text "#{copyright_note}"
+        pdf.move_down 10
+      end
+
+      # Add Copyright status(s) only if present and meaningful
+      if copyright_status.present? && copyright_status.any? { |c| c.present? }
+        pdf.text "Copyright Status", style: :bold
+        copyright_status.each { |c| pdf.text "#{c}" if c.present? }
+        pdf.move_down 10
+      end
+
+      # Add rights_statement only if present and meaningful
+      if rights_statement.present?
+        pdf.text "Rights Statement", style: :bold
+        
+        # Smart lookup for rights statement
+        begin
+          rights_file = Rails.root.join('config', 'authorities', 'rights_statements.yml')
+          if File.exist?(rights_file)
+            rights_data = YAML.load_file(rights_file)
+            rights_match = nil
+            
+            # Check if this is a term or ID match
+            rights_data['terms'].each do |term_data|
+              if term_data['term'] == rights_statement.to_s || term_data['id'] == rights_statement.to_s
+                rights_match = term_data
+                break
+              end
+            end
+            
+            if rights_match && rights_match['id'].start_with?('http://', 'https://')
+              # URL ID: show term as clickable link
+              pdf.formatted_text [
+                {
+                  text: rights_match['term'],
+                  styles: [:underline],
+                  color: "0000FF",
+                  link: rights_match['id']
+                }
+              ]
+            else
+              # Text ID or no match: show as plain text
+              pdf.text rights_statement.to_s
+            end
+          else
+            # Fallback to plain text if YAML file not found
+            pdf.text rights_statement.to_s
+          end
+        rescue => e
+          # Fallback to plain text if any error occurs
+          Rails.logger.warn "Rights statement lookup failed: #{e.message}"
+          pdf.text rights_statement.to_s
+        end
+        pdf.move_down 10
+      end
+
+      # Add Date Created only if present and meaningful
+      if date_created.present?
+        pdf.text "Date", style: :bold
+        pdf.text "#{date_created}"
+        pdf.move_down 10
+      end
 
       # Add the fixed text at the bottom center
       fixed_text = "Library of Trinity College Dublin, Digital Collections (https://digitalcollections.tcd.ie/)"
@@ -359,7 +505,7 @@ class PdfGenerationController < ApplicationController
     end
 
     def resize_image(image_data)
-      image = MiniMagick::Image.read(image_data)
+      image = MiniMagick::Image.read(image_data) 
     
       # Get the original dimensions
       original_width = image[:width]
@@ -432,7 +578,7 @@ class PdfGenerationController < ApplicationController
       # Delete or comment the next one line once in live- THIS
       # pdf_url="https://digitalcollections.tcd.ie/temp.pdf"
 
-
+    
       response = RestClient::Request.execute(method: :post, url: OCR_SPACE_API_URL, payload: {
                                   apikey: API_KEY,
                                   language: ocr_language,

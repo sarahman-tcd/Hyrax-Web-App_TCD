@@ -5,7 +5,59 @@ module Bulkrax
     end
 
     def entry_class
+      Rails.logger.debug "DEBUG: MarcXmlParser entry_class called, returning Bulkrax::MarcXmlEntry"
       Bulkrax::MarcXmlEntry
+    end
+
+    # Custom method to handle rights statement parsing
+    def parse_rights_statement(record_data)
+      Rails.logger.debug "DEBUG: MarcXmlParser parse_rights_statement called"
+      
+      # Extract rights statement from MARC XML 542$f
+      rights_nodes = record_data.xpath(".//*[local-name()='datafield'][@tag='542']")
+      rights_statements = []
+      
+      if rights_nodes && rights_nodes.any?
+        rights_nodes.each do |stmt|
+          code_f = stmt.xpath(".//*[local-name()='subfield'][@code='f']").text.strip
+          if !code_f.empty?
+            Rails.logger.debug "DEBUG: Found MARC XML 542$f value: '#{code_f}'"
+            
+            # Map to dropdown ID
+            mapped_rights = map_rights_statement_to_dropdown(code_f)
+            Rails.logger.debug "DEBUG: Mapped to ID: '#{mapped_rights}'"
+            
+            rights_statements << mapped_rights
+          end
+        end
+      end
+      
+      rights_statements
+    end
+
+    def map_rights_statement_to_dropdown(marc_value)
+      # Load the active rights statement terms from the YAML file
+      rights_file = Rails.root.join('config', 'authorities', 'rights_statements.yml')
+      return marc_value unless File.exist?(rights_file)
+      
+      rights_data = YAML.load_file(rights_file)
+      active_rights = rights_data['terms'].select { |term| term['active'] }
+      
+      # Find exact match by comparing the MARC value with rights statement terms
+      marc_value_downcase = marc_value.downcase.strip
+      
+      active_rights.each do |rights|
+        term_downcase = rights['term'].downcase.strip
+        id = rights['id']
+        
+        # Exact term match only
+        if marc_value_downcase == term_downcase
+          return id
+        end
+      end
+      
+      # If no exact match found, return the original value
+      marc_value
     end
 
     def collection_entry_class
@@ -153,6 +205,18 @@ module Bulkrax
         else
           file_paths.select { |f| MIME::Types.type_for(f).include?('application/xml') }
         end
+    end
+
+    def create_entries
+      Rails.logger.debug "DEBUG: MarcXmlParser create_entries called"
+      Rails.logger.debug "DEBUG: Parser class: #{self.class}"
+      Rails.logger.debug "DEBUG: Entry class: #{entry_class}"
+      super
+    end
+
+    def find_or_create_entry(entry_class, identifier, importerexporter_type)
+      Rails.logger.debug "DEBUG: MarcXmlParser find_or_create_entry called with entry_class: #{entry_class}"
+      super
     end
 
   end
