@@ -207,17 +207,5 @@ module Bulkrax
         end
     end
 
-    def create_entries
-      Rails.logger.debug "DEBUG: MarcXmlParser create_entries called"
-      Rails.logger.debug "DEBUG: Parser class: #{self.class}"
-      Rails.logger.debug "DEBUG: Entry class: #{entry_class}"
-      super
-    end
-
-    def find_or_create_entry(entry_class, identifier, importerexporter_type)
-      Rails.logger.debug "DEBUG: MarcXmlParser find_or_create_entry called with entry_class: #{entry_class}"
-      super
-    end
-
   end
 end
