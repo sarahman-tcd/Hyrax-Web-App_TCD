@@ -370,7 +370,7 @@ class PdfGenerationController < ApplicationController
 
       # Add license only if present and meaningful
       if license.present?
-        pdf.text "License", style: :bold
+        pdf.text "Licence", style: :bold
         
         # Check for existing CC-BY logic first (preserve existing behavior)
         if license.to_s.downcase.include?("cc-by") || license.to_s.include?("https://creativecommons.org/licenses/by/4.0/") || license.to_s.downcase.include?("creative commons by attribution 4.0 international")
