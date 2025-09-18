@@ -15,7 +15,7 @@
 <%# Custom license display: smart lookup and display logic %>
 <% if presenter.license.present? %>
   
-    <dt><%= t('hyrax.base.show.license') %></dt>
+   <dt>Licence</dt>
     <dd>
       <ul class="tabular">
         <% presenter.license.each do |license_value| %>
@@ -215,7 +215,7 @@ document.addEventListener("turbolinks:load", function () {
   const licenseDts = document.querySelectorAll("dt");
 
   licenseDts.forEach(function (dt) {
-    if (dt.textContent.trim() === "License") {
+    if (dt.textContent.trim() === "Licence") {
       const dd = dt.nextElementSibling;
       if (dd && dd.tagName === "DD") {
         let licenseLink = dd.querySelector("a");
