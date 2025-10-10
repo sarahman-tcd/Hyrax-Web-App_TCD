@@ -58,7 +58,7 @@ class PdfGenerationController < ApplicationController
     
         # Extract relevant data from Solr response
         title = work_data['title_tesim'].present? ? work_data['title_tesim'].first : 'Untitled'
-        shelf_mark = work_data['identifier_tesim'].present? ? work_data['identifier_tesim'].first : nil
+        # shelf_mark = work_data['identifier_tesim'].present? ? work_data['identifier_tesim'].first : nil
         doi = work_data['doi_tesim'].present? ? work_data['doi_tesim'].first : nil
         date_created = work_data['date_created_tesim'].present? ? work_data['date_created_tesim'].first : nil
         
@@ -76,6 +76,13 @@ class PdfGenerationController < ApplicationController
 
         contributor = if work_data['contributor_tesim'].present? && work_data['contributor_tesim'].is_a?(Array) && !work_data['contributor_tesim'].empty?
                  work_data['contributor_tesim'].first(5)
+              else
+                 nil
+              end
+              
+         # Check if shelf_mark is present, is an array, and not empty
+        shelf_mark = if work_data['identifier_tesim'].present? && work_data['identifier_tesim'].is_a?(Array) && !work_data['identifier_tesim'].empty?
+             work_data['identifier_tesim'].first(5)
               else
                  nil
               end
@@ -340,10 +347,18 @@ class PdfGenerationController < ApplicationController
 
       pdf.font_size 12
       
+      # # Add Shelf Mark/Reference Number only if present
+      # if shelf_mark.present?
+      #   pdf.text "Shelf Mark/Reference Number", style: :bold
+      #   pdf.text "#{shelf_mark}"
+      #   pdf.move_down 10
+      # end
+
+      
       # Add Shelf Mark/Reference Number only if present
-      if shelf_mark.present?
+      if shelf_mark.present? && shelf_mark.any? { |s| s.present? }
         pdf.text "Shelf Mark/Reference Number", style: :bold
-        pdf.text "#{shelf_mark}"
+        shelf_mark.each { |s| pdf.text "#{s}" if s.present? }
         pdf.move_down 10
       end
 
