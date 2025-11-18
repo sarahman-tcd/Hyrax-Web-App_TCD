@@ -228,29 +228,85 @@ document.addEventListener("turbolinks:load", function () {
 
       const minYear = -2500;
       const maxYear = new Date().getFullYear();
-      const initialStartYear = -1153;
-      const initialEndYear = 1147;
+      const initialStartYear = 1150;
+      const initialEndYear = 1950;
+
+      // Non-linear scale parameters
+      // This gives more precision to recent years while maintaining full historical range
+      const zoomPoint = 1800; // Year where we start expanding precision
+      const compressionFactor = 0.15; // How much to compress older years (0-1, lower = more compression)
+      const expansionFactor = 0.65; // How much of the slider to use for recent years (1800+)
+
+      // Get the actual rendered width of the canvas
+      function getCanvasWidth() {
+          return canvas.getBoundingClientRect().width || canvas.width;
+      }
+
+      // Convert year to slider position (non-linear)
+      function yearToPosition(year) {
+          const canvasWidth = getCanvasWidth();
+          const totalRange = maxYear - minYear;
+          const normalizedYear = (year - minYear) / totalRange; // 0 to 1
+          
+          if (year <= zoomPoint) {
+              // Older years: use compressed scale with power function
+              const zoomPointNormalized = (zoomPoint - minYear) / totalRange;
+              const yearRatio = normalizedYear / zoomPointNormalized; // 0 to 1 for older years
+              // Use power function to compress older years
+              const compressedRatio = Math.pow(yearRatio, 1.5); // Adjust exponent for more/less compression
+              return compressedRatio * zoomPointNormalized * (1 - expansionFactor) * canvasWidth;
+          } else {
+              // Recent years: use expanded linear scale
+              const zoomPointNormalized = (zoomPoint - minYear) / totalRange;
+              const recentRange = 1 - zoomPointNormalized;
+              const yearRatio = (normalizedYear - zoomPointNormalized) / recentRange; // 0 to 1 for recent years
+              const startPosition = zoomPointNormalized * (1 - expansionFactor) * canvasWidth;
+              const expandedRange = expansionFactor * canvasWidth;
+              return startPosition + yearRatio * expandedRange;
+          }
+      }
+
+      // Convert slider position to year (inverse of yearToPosition)
+      function positionToYear(position) {
+          const canvasWidth = getCanvasWidth();
+          const totalRange = maxYear - minYear;
+          const zoomPointNormalized = (zoomPoint - minYear) / totalRange;
+          const oldYearsEndPosition = zoomPointNormalized * (1 - expansionFactor) * canvasWidth;
+          
+          if (position <= oldYearsEndPosition) {
+              // Older years: reverse the compression
+              const compressedRatio = position / oldYearsEndPosition;
+              const yearRatio = Math.pow(compressedRatio, 1 / 1.5); // Inverse of power function
+              const normalizedYear = yearRatio * zoomPointNormalized;
+              return Math.round(normalizedYear * totalRange + minYear);
+          } else {
+              // Recent years: reverse the expansion
+              const startPosition = oldYearsEndPosition;
+              const expandedRange = expansionFactor * canvasWidth;
+              const yearRatio = (position - startPosition) / expandedRange;
+              const recentRange = 1 - zoomPointNormalized;
+              const normalizedYear = zoomPointNormalized + yearRatio * recentRange;
+              return Math.round(normalizedYear * totalRange + minYear);
+          }
+      }
 
       // Initialize pointers at the middle range
       const startPointer = {
-          x: ((initialStartYear - minYear) / (maxYear - minYear)) * canvas.width,
+          x: yearToPosition(initialStartYear),
           y: 25,
           label: initialStartYear < 0 ? Math.abs(initialStartYear) + " BCE" : initialStartYear+ " CE",
       };
     
       const endPointer = {
-          x: ((initialEndYear - minYear) / (maxYear - minYear)) * canvas.width,
+          x: yearToPosition(initialEndYear),
           y: 25,
           label: initialEndYear < 0 ? Math.abs(initialEndYear) + " BCE" : initialEndYear + " CE",
       };
 
       function updateYearLabels() {
-          const startPercent = startPointer.x / canvas.width;
-          const endPercent = endPointer.x / canvas.width;
-
           // Calculate the start and end year based on the pointer positions
-          const startYear = Math.round(startPercent * (maxYear - minYear) + minYear);
-          const endYear = Math.round(endPercent * (maxYear - minYear) + minYear);
+          const startYear = positionToYear(startPointer.x);
+          const endYear = positionToYear(endPointer.x);
 
           // Function to format the year as BCE or CE
           function formatYear(year) {
@@ -341,7 +397,7 @@ document.addEventListener("turbolinks:load", function () {
       function dragPointer(e, pointer) {
           const rect = canvas.getBoundingClientRect();
           const minLeft = 0;
-          const maxLeft = canvas.width;
+          const maxLeft = getCanvasWidth();
 
           function onMouseMove(event) {
               let newX = event.clientX - rect.left;
@@ -384,9 +440,37 @@ document.addEventListener("turbolinks:load", function () {
           }
       });
 
+      // Sync canvas internal width with rendered width for proper scaling
+      function syncCanvasSize() {
+          const renderedWidth = canvas.getBoundingClientRect().width;
+          if (renderedWidth && renderedWidth > 0 && renderedWidth !== canvas.width) {
+              // Get current year values before resizing
+              const startYear = positionToYear(startPointer.x);
+              const endYear = positionToYear(endPointer.x);
+              
+              // Update canvas internal width (this resets the context)
+              canvas.width = renderedWidth;
+              
+              // Recalculate pointer positions with new width
+              startPointer.x = yearToPosition(startYear);
+              endPointer.x = yearToPosition(endYear);
+          }
+      }
+
       // Initial setup
+      syncCanvasSize();
       updateYearLabels();
       drawSlider();
+
+      // Handle window resize
+      let resizeTimeout;
+      window.addEventListener('resize', function() {
+          clearTimeout(resizeTimeout);
+          resizeTimeout = setTimeout(function() {
+              syncCanvasSize();
+              drawSlider();
+          }, 100);
+      });
 
       const searchButton = document.getElementById('search-button');
       const rowsContainer = document.getElementById('dynamic-search-rows');
@@ -444,12 +528,10 @@ document.addEventListener("turbolinks:load", function () {
         // Restore time slider values
         if (savedTimeRange) {
             const [startYear, endYear] = JSON.parse(savedTimeRange);
-            startPointer.label = startYear;
-            endPointer.label = endYear;
     
-            // Update the pointers based on saved values
-            startPointer.x = ((startYear - minYear) / (maxYear - minYear)) * canvas.width;
-            endPointer.x = ((endYear - minYear) / (maxYear - minYear)) * canvas.width;
+            // Update the pointers based on saved values using non-linear scale
+            startPointer.x = yearToPosition(startYear);
+            endPointer.x = yearToPosition(endYear);
     
             // Update labels and redraw the slider
             updateYearLabels();
@@ -657,11 +739,9 @@ document.addEventListener("turbolinks:load", function () {
             row.querySelector(".q").value = ''; // reset search input
         });
 
-        // Clear the time slider to the default state
-        startPointer.label = initialStartYear;
-        endPointer.label = initialEndYear;
-        startPointer.x = ((initialStartYear - minYear) / (maxYear - minYear)) * canvas.width;
-        endPointer.x = ((initialEndYear - minYear) / (maxYear - minYear)) * canvas.width;
+        // Clear the time slider to the default state using non-linear scale
+        startPointer.x = yearToPosition(initialStartYear);
+        endPointer.x = yearToPosition(initialEndYear);
         updateYearLabels();
         drawSlider();
 

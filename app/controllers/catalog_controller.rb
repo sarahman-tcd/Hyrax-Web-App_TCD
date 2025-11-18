@@ -272,6 +272,7 @@ end
       Rails.logger.debug "User input date range: #{user_input}"
       @documents = filter_documents_by_date_range(@documents, user_input)
       Rails.logger.debug "filtered_results: #{@documents.count}"
+      update_response_after_filter!(@response, @documents)
     end
     
     respond_to do |format|
@@ -392,6 +393,20 @@ def filter_documents_by_date_range(documents, user_range)
     extracted_years.any? { |year| year.between?(start_year, end_year) }
   end
 end
+
+def update_response_after_filter!(response, documents)
+  response['response'] ||= {}
+
+  response['response']['numFound'] = documents.length
+
+  per_page = response.rows.positive? ? response.rows : documents.length
+  current_page = params[:page].present? ? params[:page].to_i : 1
+  response['response']['start'] = per_page * (current_page - 1)
+
+  response.instance_variable_set(:@documents, documents)
+  response.instance_variable_set(:@pages, nil)
+end
+ 
 
 
 

@@ -136,6 +136,7 @@
   document.getElementById("reload-map-btn").addEventListener("click", function () {
       location.reload();
   });
+   <%# Uncomment THIS to add Place of Publication to the sidebar
   document.getElementById("publisher-location-sidebar-item").addEventListener("click", function(event) {
     event.preventDefault();
     let mapView = document.getElementById("publisher-location-map");
@@ -154,6 +155,7 @@
       }
     }
   });
+  %>
 </script>
 
 <script>
