@@ -22,6 +22,17 @@
     <%= render 'location-based-filter' %>
   </div>
   <%= render 'search_results' %>
+  
+  <!-- AJAX Pagination Containers -->
+  <div id="ajax-results" style="display:none;">
+    <div id="ajax-controls-top" class="row" style="margin-bottom: 20px; background-color: #f5f5f5; padding: 10px; border-radius: 4px;">
+      <!-- Will be populated by JS -->
+    </div>
+    
+    <div id="ajax-documents"></div>
+    
+    <div id="ajax-pagination" style="margin-top: 20px;"></div>
+  </div>
 </div>
 
 <div id="sidebar" class="col-md-3 col-md-pull-9 col-sm-4 col-sm-pull-8">

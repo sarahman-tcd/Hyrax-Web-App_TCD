@@ -1,6 +1,12 @@
 class CatalogParamsConstraint
-  ALLOWED_PARAMS = ['locale', 'utf8', 'search_field', 'search_operator', 'search_query', 'search_logic', 'q', 'f', 'sort', 'per_page', 'view', 'page', 'logic', 'field', 'operator', 'keyword', 'rights_statement', 'resource_type', 'language', 'license', 'location', 'location_filter'].freeze
-  ALLOWED_LOCALES = ['en', 'pt-BR', 'de', 'es', 'fr', 'ga', 'it', 'zh'].freeze
+  ALLOWED_PARAMS = [
+  'locale', 'utf8', 'search_field', 'search_operator', 'search_query',
+  'search_logic', 'q', 'f', 'sort', 'per_page', 'view', 'page', 'logic',
+  'field', 'operator', 'keyword', 'rights_statement', 'resource_type',
+  'language', 'license', 'location', 'location_filter',
+  'search_rows', 'date_range'   # ← missing ones
+].freeze
+ALLOWED_LOCALES = ['en', 'pt-BR', 'de', 'es', 'fr', 'ga', 'it', 'zh'].freeze
   
     def matches?(request)
       query_params = request.query_parameters

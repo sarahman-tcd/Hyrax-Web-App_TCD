@@ -623,23 +623,31 @@ document.addEventListener("turbolinks:load", function () {
           let operator = row.querySelector(".operator-dropdown").value;
           let query = row.querySelector(".q").value.trim();
   
+          // Skip empty queries
+          if (!query) return;
+  
           // Apply correct formatting based on the operator
-          query = query.includes(' ') ? `"${query}"` : query;
+          // Handle multi-word queries and operators properly
           if (operator === 'contains') {
-              query = `*${query}*`;
+              // For contains: wrap in wildcards, and if it has spaces, also add quotes
+              query = query.includes(' ') ? `*"${query}"*` : `*${query}*`;
           } else if (operator === 'starts_with') {
-              query = `${query}*`;
+              // For starts_with: add trailing wildcard, and if it has spaces, add quotes
+              query = query.includes(' ') ? `"${query}"*` : `${query}*`;
           } else if (operator === 'equal') {
+              // For exact: always wrap in quotes
               query = `"${query}"`;
           }
   
-          let queryPart = `(${field}:${query})`;
+          let queryPart = `${field}:${query}`;
   
           // Special handling for combined facets
           if (field === "contributor_tesim") {
-              queryPart = `(contributor_tesim:${query}) OR (creator_tesim:${query})`;
+              queryPart = `(contributor_tesim:${query} OR creator_tesim:${query})`;
           } else if (field === "keyword_tesim") {
-              queryPart = `(keyword_tesim:${query}) OR (subject_tesim:${query})`;
+              queryPart = `(keyword_tesim:${query} OR subject_tesim:${query})`;
+          } else {
+              queryPart = `(${queryPart})`;
           }
   
           // Append logic only from the second row onward
