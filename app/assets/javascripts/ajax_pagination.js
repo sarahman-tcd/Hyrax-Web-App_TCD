@@ -84,8 +84,13 @@ $(document).on('turbolinks:load', function () {
 function loadFilteredResults(query, startYear, endYear, page, perPage, sort) {
   console.log(`Loading page ${page}, per_page ${perPage}, sort ${sort}`);
 
-  // Show loading indicator
-  $('#ajax-documents').html('<div class="loading">Loading results...</div>');
+  // Show loading indicator with overlay
+  $('#ajax-documents').html(`
+    <div class="ajax-loading-overlay">
+      <div class="ajax-loading-spinner"></div>
+      <div class="ajax-loading-text">Loading results...</div>
+    </div>
+  `);
 
   $.ajax({
     url: '/catalog/filtered_search',
@@ -211,21 +216,32 @@ function injectStyles() {
         overflow: hidden;
       }
       /* Loading State */
-      .ajax-loading {
-        text-align: center;
-        padding: 40px;
-        color: #586069;
-        font-size: 16px;
+      .ajax-loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.9);
+        z-index: 10000;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
       }
       .ajax-loading-spinner {
-        display: inline-block;
-        width: 30px;
-        height: 30px;
-        border: 3px solid #e1e4e8;
+        width: 50px;
+        height: 50px;
+        border: 4px solid #e1e4e8;
         border-top-color: #1074b7;
         border-radius: 50%;
         animation: spin 1s linear infinite;
-        margin-bottom: 10px;
+        margin-bottom: 15px;
+      }
+      .ajax-loading-text {
+        color: #586069;
+        font-size: 16px;
+        font-weight: 500;
       }
       @keyframes spin {
         to { transform: rotate(360deg); }

@@ -38,6 +38,7 @@ Rails.application.routes.draw do
   get '/export/dublinCore.xml', to: 'export#dublinCore', constraints: DublinCoreParamsConstraint.new
   # get '/iiif/*path', to: 'riiif/images#show', constraints: AboutParamsConstraint.new
   get '/search_assist/index', to: 'search_assist#index', constraints: AboutParamsConstraint.new
+  get '/autocomplete/titles', to: 'autocomplete#titles', constraints: AboutParamsConstraint.new
 
   get '/zotero', to: 'hyrax/static#zotero', constraints: AboutParamsConstraint.new
   get '/mendeley', to: 'hyrax/static#mendeley', constraints: AboutParamsConstraint.new

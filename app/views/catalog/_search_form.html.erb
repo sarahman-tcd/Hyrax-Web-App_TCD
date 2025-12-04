@@ -23,7 +23,7 @@
         <div class="q-line-static " id="dynamic-search-rows">
           <div class="row search-row">
             <div class="form-group" style="padding-right:15px; padding-left:15px ">
-              <label>Creation Date</label><br>
+              <label>Created Between</label><br>
               <canvas id="timeline-canvas" width="885" height="50" style="padding-right:5px; padding-left:0px "></canvas>
             </div>
 
@@ -46,7 +46,7 @@
               <select name="search_operator[]" class="form-control operator-dropdown">
                 <option value="contains">Contains</option>
                 <option value="starts_with">Starts With</option>
-                <option value="equal">Equals</option>
+                <option value="equal">Exact</option>
               </select>
             </div>
             <div class="col-sm-6">
@@ -99,6 +99,9 @@
   </div>
 <% end %>
 
+<!-- jQuery UI for Autocomplete -->
+<link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+<script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
 
 <script>
 document.addEventListener("turbolinks:load", function () {
@@ -175,7 +178,7 @@ document.addEventListener("turbolinks:load", function () {
             <select name="search_operator[]" class="form-control operator-dropdown">
               <option value="contains">Contains</option>
               <option value="starts_with">Starts With</option>
-              <option value="equal">Equals</option>
+              <option value="equal">Exact</option>
             </select>
           </div>
           <div class="col-sm-3">
@@ -329,7 +332,7 @@ document.addEventListener("turbolinks:load", function () {
           // Draw timeline background for the entire slider
           const radius = 6; // Adjust this value for more or less rounding
 
-          ctx.fillStyle = "#fff"; // Background color outside the range
+          ctx.fillStyle = "#f0f0f0"; // Light gray background outside the range
           
           // Draw rounded rectangle manually
           ctx.beginPath();
@@ -342,20 +345,41 @@ document.addEventListener("turbolinks:load", function () {
           ctx.fill();
           
 
-          // Draw timeline background for the selected range
-          ctx.fillStyle = "#7ac1f5"; // Highlight color for the range
+          // Draw timeline background for the selected range with gradient
+          const gradient = ctx.createLinearGradient(startPointer.x, 0, endPointer.x, 0);
+          gradient.addColorStop(0, "#667eea");    // Purple
+          gradient.addColorStop(0.5, "#4facfe");  // Blue
+          gradient.addColorStop(1, "#00f2fe");    // Cyan
+          ctx.fillStyle = gradient;
           ctx.fillRect(startPointer.x, startPointer.y - 5, endPointer.x - startPointer.x, 12);
 
-          // Draw start pointer
-          ctx.fillStyle = "#1074b7";
+          // Draw start pointer with gradient
+          const startGradient = ctx.createRadialGradient(startPointer.x, startPointer.y, 0, startPointer.x, startPointer.y, 10);
+          startGradient.addColorStop(0, "#667eea");
+          startGradient.addColorStop(1, "#764ba2");
+          ctx.fillStyle = startGradient;
           ctx.beginPath();
           ctx.arc(startPointer.x, startPointer.y, 10, 0, Math.PI * 2);
           ctx.fill();
+          
+          // Add white border to pointer
+          ctx.strokeStyle = "#fff";
+          ctx.lineWidth = 2;
+          ctx.stroke();
 
-          // Draw end pointer
+          // Draw end pointer with gradient
+          const endGradient = ctx.createRadialGradient(endPointer.x, endPointer.y, 0, endPointer.x, endPointer.y, 10);
+          endGradient.addColorStop(0, "#00f2fe");  // Cyan
+          endGradient.addColorStop(1, "#4facfe");  // Blue
+          ctx.fillStyle = endGradient;
           ctx.beginPath();
           ctx.arc(endPointer.x, endPointer.y, 10, 0, Math.PI * 2);
           ctx.fill();
+          
+          // Add white border to pointer
+          ctx.strokeStyle = "#fff";
+          ctx.lineWidth = 2;
+          ctx.stroke();
 
           // Draw labels
           ctx.fillStyle = "#fff";
