@@ -359,6 +359,9 @@ end
       
       Rails.logger.debug "AJAX filtered_search params passed to fetch: #{search_params.inspect}"
       
+      # Force Solr to use lucene parser for explicit field queries
+      search_params[:defType] = 'lucene'
+      
       # Extract pagination params
       page = (params[:page] || 1).to_i
       per_page = (params[:per_page] || 10).to_i
@@ -541,6 +544,8 @@ def fetch_all_documents_for_filter(search_params)
   page_num = 1
   batch_size = 100
   
+  Rails.logger.debug "fetch_all_documents_for_filter called with: #{search_params.inspect}"
+  
   loop do
     batch_params = search_params.dup
     batch_params.delete(:rows)
@@ -548,7 +553,9 @@ def fetch_all_documents_for_filter(search_params)
     batch_params[:rows] = batch_size
     batch_params[:per_page] = batch_size
     
+    Rails.logger.debug "Calling search_results with batch_params: #{batch_params.inspect}"
     _, docs = search_results(batch_params)
+    Rails.logger.debug "search_results returned #{docs.size} documents"
     break if docs.empty?
     
     all_docs.concat(docs)
@@ -556,6 +563,7 @@ def fetch_all_documents_for_filter(search_params)
     page_num += 1
   end
   
+  Rails.logger.debug "fetch_all_documents_for_filter returning #{all_docs.size} total documents"
   all_docs
 end
 
@@ -747,16 +755,78 @@ end
 def build_combined_query(logic, fields, operators, queries)
    query_parts = []
    
+   # Security: Validate inputs
+   return '*:*' if queries.nil? || fields.nil? || operators.nil?
+   
+   # Whitelist allowed fields
+   allowed_fields = [
+     "any", "title", "creator", "contributor", "description", 
+     "keyword", "publisher", "subject", "identifier", "date_created"
+   ]
+   
+   # Whitelist allowed operators
+   allowed_operators = ["contains", "exact", "equals", "starts_with"]
+   
+   # Whitelist allowed logic operators
+   allowed_logic = ["AND", "OR", "NOT"]
+   
    queries.each_with_index do |query, index|
    next if query.blank?
-
+   
+   # Security: Validate query length (prevent DoS)
+   next if query.length > 1000
+   
    field = fields[index]
    operator = operators[index]
+   
+   # Security: Validate field is in whitelist
+   next unless allowed_fields.include?(field.to_s.downcase)
+   
+   # Security: Validate operator is in whitelist
+   next unless allowed_operators.include?(operator.to_s.downcase)
+   
+   # Security: Validate logic operator if present
+   if index > 0 && logic[index - 1]
+     next unless allowed_logic.include?(logic[index - 1].to_s.upcase)
+   end
 
    solr_field = map_field_to_solr(field)
-   solr_operator = map_operator_to_solr(operator, query)
-
-   query_parts << solr_operator % { field: solr_field, query: query }
+   
+   Rails.logger.debug "Advanced Search - Field: #{field}, Operator: #{operator}, Query: #{query}"
+   Rails.logger.debug "Advanced Search - Mapped Solr Field: #{solr_field}"
+   
+   # Handle "any" field specially - search across all fields
+   if field == "any" || field.to_s.downcase == "any"
+     # Define all searchable fields
+     all_fields = [
+       "title_tesim",
+       "creator_tesim",
+       "contributor_tesim",
+       "description_tesim",
+       "keyword_tesim",
+       "publisher_tesim",
+       "subject_tesim",
+       "identifier_tesim",
+       "date_created_tesim"
+     ]
+     
+     Rails.logger.debug "Advanced Search - Using ANY field, searching across: #{all_fields.join(', ')}"
+     
+     # Build query for each field and combine with OR
+     field_queries = all_fields.map do |field_name|
+       query_part = map_operator_to_solr(operator, query, field_name, true)
+       Rails.logger.debug "Advanced Search - Field #{field_name} query: #{query_part}"
+       query_part
+     end
+     combined = "(#{field_queries.join(' OR ')})"
+     Rails.logger.debug "Advanced Search - Combined ANY query: #{combined}"
+     query_parts << combined
+   else
+     # Single field search
+     single_query = map_operator_to_solr(operator, query, solr_field, false)
+     Rails.logger.debug "Advanced Search - Single field query: #{single_query}"
+     query_parts << single_query
+   end
    end
 
    # Join query parts using the provided logic (AND, OR, NOT)
@@ -785,16 +855,62 @@ def map_field_to_solr(field)
    field_mappings[field] || "all_text_timv" # Default to "Any Field"
 end
 
-def map_operator_to_solr(operator, query)
+def map_operator_to_solr(operator, query, field, is_any_field = false)
+   # Escape special Solr characters except wildcards for certain operators
+   def escape_solr_query(str, allow_wildcards = false)
+     if allow_wildcards
+       # Escape everything except * and ?
+       str.gsub(/([+\-&|!(){}\[\]^"~:\\\/])/) { |match| "\\#{match}" }
+     else
+       # Escape all special characters including wildcards
+       str.gsub(/([+\-&|!(){}\[\]^"~*?:\\\/])/) { |match| "\\#{match}" }
+     end
+   end
+   
    case operator
    when "contains"
-   "%{field}:*%{query}*"
+     # For "any" field with multiple words, use simpler OR logic (like simple search)
+     if is_any_field
+       words = query.strip.split(/\s+/)
+       if words.length > 1
+         # For any field: each word can appear in any field (more permissive)
+         escaped_query = words.map { |w| escape_solr_query(w, true) }.join(' ')
+         "#{field}:(#{escaped_query})"
+       else
+         escaped_query = escape_solr_query(query, true)
+         "#{field}:*#{escaped_query}*"
+       end
+     else
+       # For specific fields: all words must appear in that field
+       words = query.strip.split(/\s+/)
+       if words.length > 1
+         word_queries = words.map do |word|
+           escaped_word = escape_solr_query(word, true)
+           "#{field}:*#{escaped_word}*"
+         end
+         "(#{word_queries.join(' AND ')})"
+       else
+         escaped_query = escape_solr_query(query, true)
+         "#{field}:*#{escaped_query}*"
+       end
+     end
+     
+   when "exact", "equals"
+     # Exact phrase match - use quotes for phrase matching (case-insensitive)
+     clean_query = query.gsub('"', '')
+     escaped_query = escape_solr_query(clean_query, false)
+     "#{field}:\"#{escaped_query}\""
+     
    when "starts_with"
-   "%{field}:%{query}*"
-   when "equals"
-   "%{field}:%{query}"
+     # Starts with - must match at beginning of field (no leading wildcard)
+     # Use phrase query to ensure it's at the start
+     escaped_query = escape_solr_query(query, false)
+     "#{field}:\"#{escaped_query}\"*"
+     
    else
-   "%{field}:*%{query}*" # Default to "contains"
+     # Default to "contains"
+     escaped_query = escape_solr_query(query, true)
+     "#{field}:*#{escaped_query}*"
    end
 end
 

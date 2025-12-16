@@ -60,7 +60,7 @@
         <label  id="add-line"  class="btn clickable-add-option"><i class="fa fa-plus"></i> Add New Search</label>  
         <label id="clear-all"
               class="btn clickable-clear-option"
-              data-redirect-url="<%= main_app.search_catalog_path(f: { human_readable_type_sim: ["Collection"]}) %>">
+              data-redirect-url="<%= main_app.search_catalog_path %>">
           <i class="fa fa-refresh"></i> Clear All
         </label>
       </div>
@@ -107,6 +107,21 @@
 document.addEventListener("turbolinks:load", function () {
 
       $('#search-field-header').removeAttr('value');
+      
+      // Add Enter key support for advanced search inputs
+      document.addEventListener('keypress', function(e) {
+        // Check if Enter key was pressed
+        if (e.key === 'Enter' || e.keyCode === 13) {
+          // Check if the target is a search input field in advanced search
+          if (e.target.classList.contains('q') || 
+              e.target.id === 'search-field-header') {
+            e.preventDefault();
+            // Submit the search form
+            document.getElementById('search-form-header').submit();
+          }
+        }
+      });
+      
       //Placeholder Animation
       const searchField = document.getElementById("search-field-header");
       
@@ -231,6 +246,7 @@ document.addEventListener("turbolinks:load", function () {
 
       const minYear = -2500;
       const maxYear = new Date().getFullYear();
+      console.log('Date range slider - Current year (maxYear):', maxYear);
       const initialStartYear = 1150;
       const initialEndYear = 1950;
 
@@ -289,7 +305,9 @@ document.addEventListener("turbolinks:load", function () {
               const yearRatio = (position - startPosition) / expandedRange;
               const recentRange = 1 - zoomPointNormalized;
               const normalizedYear = zoomPointNormalized + yearRatio * recentRange;
-              return Math.round(normalizedYear * totalRange + minYear);
+              const calculatedYear = Math.round(normalizedYear * totalRange + minYear);
+              // Ensure we never exceed maxYear
+              return Math.min(calculatedYear, maxYear);
           }
       }
 
@@ -648,38 +666,90 @@ document.addEventListener("turbolinks:load", function () {
           let query = row.querySelector(".q").value.trim();
   
           // Skip empty queries
-          if (!query) return;
-  
-          // Apply correct formatting based on the operator
-          // Handle multi-word queries and operators properly
-          if (operator === 'contains') {
-              // For contains: wrap in wildcards, and if it has spaces, also add quotes
-              query = query.includes(' ') ? `*"${query}"*` : `*${query}*`;
-          } else if (operator === 'starts_with') {
-              // For starts_with: add trailing wildcard, and if it has spaces, add quotes
-              query = query.includes(' ') ? `"${query}"*` : `${query}*`;
-          } else if (operator === 'equal') {
-              // For exact: always wrap in quotes
-              query = `"${query}"`;
-          }
-  
-          let queryPart = `${field}:${query}`;
-  
-          // Special handling for combined facets
-          if (field === "contributor_tesim") {
-              queryPart = `(contributor_tesim:${query} OR creator_tesim:${query})`;
-          } else if (field === "keyword_tesim") {
-              queryPart = `(keyword_tesim:${query} OR subject_tesim:${query})`;
-          } else {
-              queryPart = `(${queryPart})`;
-          }
-  
-          // Append logic only from the second row onward
-          if (index > 0 && logic) {
-              combinedQuery += ` ${logic} `;
-          }
-  
-          combinedQuery += queryPart;
+        if (!query) return;
+
+        // Apply correct formatting based on the operator
+        // Handle multi-word queries and operators properly
+        if (operator === 'contains') {
+            // For contains: just wrap in wildcards (don't use quotes for multi-word)
+            query = `*${query}*`;
+        } else if (operator === 'starts_with') {
+            // For starts_with: just add trailing wildcard (no quotes)
+            query = `${query}*`;
+        } else if (operator === 'equal') {
+            // For exact: always wrap in quotes
+            query = `"${query}"`;
+        }
+
+        let queryPart;
+        
+        // Handle "any" field - search across all fields
+        if (field === 'any') {
+            const allFields = [
+                'title_tesim',
+                'creator_tesim',
+                'contributor_tesim',
+                'description_tesim',
+                'keyword_tesim',
+                'publisher_tesim',
+                'subject_tesim',
+                'identifier_tesim',
+                'date_created_tesim'
+            ];
+            
+            // For contains with multiple words, split and search each word
+            if (operator === 'contains' && query.includes(' ')) {
+                const words = query.replace(/\*/g, '').trim().split(/\s+/);
+                // Each word must appear in at least one field (AND between words, OR between fields)
+                const wordQueries = words.map(word => {
+                    const fieldQueries = allFields.map(f => `${f}:*${word}*`).join(' OR ');
+                    return `(${fieldQueries})`;
+                });
+                queryPart = wordQueries.join(' AND ');
+            } else {
+                // Single word or other operators - use the formatted query
+                const fieldQueries = allFields.map(f => `${f}:${query}`).join(' OR ');
+                queryPart = `(${fieldQueries})`;
+            }
+        }
+        // Special handling for combined facets
+        else if (field === "contributor_tesim") {
+            if (operator === 'contains') {
+                const words = query.replace(/\*/g, '').trim().split(/\s+/);
+                const wordQueries = words.map(word => 
+                    `(contributor_tesim:*${word}* OR creator_tesim:*${word}*)`
+                );
+                queryPart = wordQueries.join(' AND ');
+            } else {
+                queryPart = `(contributor_tesim:${query} OR creator_tesim:${query})`;
+            }
+        } else if (field === "keyword_tesim") {
+            if (operator === 'contains') {
+                const words = query.replace(/\*/g, '').trim().split(/\s+/);
+                const wordQueries = words.map(word => 
+                    `(keyword_tesim:*${word}* OR subject_tesim:*${word}*)`
+                );
+                queryPart = wordQueries.join(' AND ');
+            } else {
+                queryPart = `(keyword_tesim:${query} OR subject_tesim:${query})`;
+            }
+        } else {
+            // Single specific field
+            if (operator === 'contains') {
+                const words = query.replace(/\*/g, '').trim().split(/\s+/);
+                const wordQueries = words.map(word => `${field}:*${word}*`);
+                queryPart = `(${wordQueries.join(' AND ')})`;
+            } else {
+                queryPart = `(${field}:${query})`;
+            }
+        }
+
+        // Append logic only from the second row onward
+        if (index > 0 && logic) {
+            combinedQuery += ` ${logic} `;
+        }
+
+        combinedQuery += queryPart;
       });
   
       // Fetch time range values from the timeline slider
@@ -690,8 +760,8 @@ document.addEventListener("turbolinks:load", function () {
           combinedQuery += " AND ";
       }
   
-      // Append time range filter to query
-      combinedQuery += `(date_created_tesim:[${startYear}TO${endYear}])`;
+      // Append time range filter to query (include records without dates)
+      combinedQuery += `(date_created_tesim:[${startYear} TO ${endYear}] OR (*:* NOT date_created_tesim:*))`;
   
       return new URLSearchParams({ q: combinedQuery }).toString();
   }
@@ -782,7 +852,7 @@ document.addEventListener("turbolinks:load", function () {
         simplePanel.style.display = 'block';
         document.getElementById("advance-search-option").style.display = 'block';
 
-        // Refresh the page to reset everything
+        // Redirect to catalog root to show all records
         const url = clearAllButton.getAttribute("data-redirect-url");
         if (url) {
           window.location.href = url;
