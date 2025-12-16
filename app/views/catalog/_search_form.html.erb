@@ -674,8 +674,9 @@ document.addEventListener("turbolinks:load", function () {
             // For contains: just wrap in wildcards (don't use quotes for multi-word)
             query = `*${query}*`;
         } else if (operator === 'starts_with') {
-            // For starts_with: just add trailing wildcard (no quotes)
-            query = `${query}*`;
+            // For starts_with: do NOT add wildcard here, it's added later
+            // But we DO need to escape spaces for Solr string fields
+            query = query.replace(/ /g, '\\ ');
         } else if (operator === 'equal') {
             // For exact: always wrap in quotes
             query = `"${query}"`;
@@ -683,32 +684,61 @@ document.addEventListener("turbolinks:load", function () {
 
         let queryPart;
         
+        // Helper to get correct field name for starts_with
+        const getFieldForOperator = (fieldName, op) => {
+            if (op !== 'starts_with') return fieldName;
+            
+            // Map of fields that have string (_sim) versions suitable for prefix search
+            const simFieldMap = {
+                'title_tesim': 'title_sim',
+                'creator_tesim': 'creator_sim',
+                'contributor_tesim': 'contributor_sim',
+                'keyword_tesim': 'keyword_sim',
+                'publisher_tesim': 'publisher_sim',
+                'subject_tesim': 'subject_sim',
+                'language_tesim': 'language_sim',
+                'genre_tesim': 'genre_sim',
+                'resource_type_tesim': 'resource_type_sim'
+            };
+            
+            return simFieldMap[fieldName] || fieldName;
+        };
+
         // Handle "any" field - search across all fields
         if (field === 'any') {
             const allFields = [
-                'title_tesim',
-                'creator_tesim',
+                'abstract_tesim',
                 'contributor_tesim',
-                'description_tesim',
+                'creator_tesim',
                 'keyword_tesim',
-                'publisher_tesim',
                 'subject_tesim',
+                'publisher_tesim',
                 'identifier_tesim',
-                'date_created_tesim'
+                'title_tesim',
+                'copyright_note_tesim',
+                'digital_object_identifier_tesim'
             ];
             
-            // For contains with multiple words, split and search each word
-            if (operator === 'contains' && query.includes(' ')) {
-                const words = query.replace(/\*/g, '').trim().split(/\s+/);
-                // Each word must appear in at least one field (AND between words, OR between fields)
+            if (operator === 'contains') {
+                // Split into words and search each word across all fields
+                const words = query.trim().split(/\s+/);
                 const wordQueries = words.map(word => {
                     const fieldQueries = allFields.map(f => `${f}:*${word}*`).join(' OR ');
                     return `(${fieldQueries})`;
                 });
                 queryPart = wordQueries.join(' AND ');
-            } else {
-                // Single word or other operators - use the formatted query
-                const fieldQueries = allFields.map(f => `${f}:${query}`).join(' OR ');
+            } else if (operator === 'starts_with') {
+                // For starts_with: use prefix query on _sim fields where available
+                const fieldQueries = allFields.map(f => {
+                    const searchField = getFieldForOperator(f, operator);
+                    // Only escape spaces if we switched to a _sim field
+                    const val = (searchField !== f) ? query.replace(/ /g, '\\ ') : query;
+                    return `${searchField}:${val}*`;
+                }).join(' OR ');
+                queryPart = `(${fieldQueries})`;
+            } else if (operator === 'equal') {
+                // For exact: use phrase query
+                const fieldQueries = allFields.map(f => `${f}:"${query}"`).join(' OR ');
                 queryPart = `(${fieldQueries})`;
             }
         }
@@ -720,6 +750,8 @@ document.addEventListener("turbolinks:load", function () {
                     `(contributor_tesim:*${word}* OR creator_tesim:*${word}*)`
                 );
                 queryPart = wordQueries.join(' AND ');
+            } else if (operator === 'starts_with') {
+                queryPart = `(contributor_sim:${query}* OR creator_sim:${query}*)`;
             } else {
                 queryPart = `(contributor_tesim:${query} OR creator_tesim:${query})`;
             }
@@ -730,6 +762,8 @@ document.addEventListener("turbolinks:load", function () {
                     `(keyword_tesim:*${word}* OR subject_tesim:*${word}*)`
                 );
                 queryPart = wordQueries.join(' AND ');
+            } else if (operator === 'starts_with') {
+                queryPart = `(keyword_sim:${query}* OR subject_sim:${query}*)`;
             } else {
                 queryPart = `(keyword_tesim:${query} OR subject_tesim:${query})`;
             }
@@ -740,7 +774,9 @@ document.addEventListener("turbolinks:load", function () {
                 const wordQueries = words.map(word => `${field}:*${word}*`);
                 queryPart = `(${wordQueries.join(' AND ')})`;
             } else {
-                queryPart = `(${field}:${query})`;
+                const searchField = getFieldForOperator(field, operator);
+                const val = operator === 'starts_with' ? `${query}*` : query;
+                queryPart = `(${searchField}:${val})`;
             }
         }
 

@@ -900,12 +900,34 @@ def map_operator_to_solr(operator, query, field, is_any_field = false)
      clean_query = query.gsub('"', '')
      escaped_query = escape_solr_query(clean_query, false)
      "#{field}:\"#{escaped_query}\""
-     
-   when "starts_with"
-     # Starts with - must match at beginning of field (no leading wildcard)
-     # Use phrase query to ensure it's at the start
-     escaped_query = escape_solr_query(query, false)
-     "#{field}:\"#{escaped_query}\"*"
+        when "starts_with"
+      # Starts with - must match at beginning of field (no leading wildcard)
+      # Use prefix query on string (_sim) fields where available for accurate results
+      
+      # Map of fields that have string (_sim) versions suitable for prefix search
+      sim_field_map = {
+        'title_tesim' => 'title_sim',
+        'creator_tesim' => 'creator_sim',
+        'contributor_tesim' => 'contributor_sim',
+        'keyword_tesim' => 'keyword_sim',
+        'publisher_tesim' => 'publisher_sim',
+        'subject_tesim' => 'subject_sim',
+        'language_tesim' => 'language_sim',
+        'genre_tesim' => 'genre_sim',
+        'resource_type_tesim' => 'resource_type_sim'
+      }
+      
+      # Use the _sim field if available, otherwise fall back to the provided field
+      search_field = sim_field_map[field] || field
+      
+      # Only escape spaces if we switched to a _sim field
+      if search_field != field
+        escaped_query = escape_solr_query(query, false).gsub(' ', '\\ ')
+      else
+        escaped_query = escape_solr_query(query, false)
+      end
+      
+      "#{search_field}:#{escaped_query}*"
      
    else
      # Default to "contains"
