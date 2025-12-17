@@ -1,0 +1,94 @@
+/* Modern Search Results Card Design */
+.ajax-result-card {
+    background: #fff;
+    border: 1px solid #e1e4e8;
+    border-radius: 6px;
+    padding: 20px;
+    margin-bottom: 16px;
+    transition: all 0.2s ease-in-out;
+    display: flex;
+    align-items: flex-start;
+}
+
+.ajax-result-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(149, 157, 165, 0.2);
+    border-color: #d1d5da;
+}
+
+.ajax-thumbnail-container {
+    flex: 0 0 100px;
+    margin-right: 20px;
+}
+
+.ajax-thumbnail {
+    width: 100%;
+    height: auto;
+    border-radius: 4px;
+    border: 1px solid #eaecef;
+    display: block;
+}
+
+.ajax-content {
+    flex: 1;
+    min-width: 0;
+    /* Fix for flexbox truncation */
+}
+
+.ajax-title {
+    margin: 0 0 8px 0;
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.ajax-title a {
+    color: #1074b7;
+    text-decoration: none;
+}
+
+.ajax-title a:hover {
+    text-decoration: underline;
+}
+
+.ajax-meta-row {
+    display: flex;
+    margin-bottom: 4px;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.ajax-label {
+    flex: 0 0 120px;
+    font-weight: 600;
+    color: #586069;
+}
+
+.ajax-value {
+    flex: 1;
+    color: #24292e;
+}
+
+.truncate-3-lines {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Placeholder Thumbnail */
+.placeholder-thumbnail {
+    display: block;
+    text-align: center;
+    background: #f6f8fa;
+    border: 1px solid #eaecef;
+    border-radius: 4px;
+    height: 100px;
+    line-height: 100px;
+}
+
+.placeholder-icon {
+    font-size: 40px;
+    color: #d1d5da;
+    vertical-align: middle;
+}

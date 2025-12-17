@@ -941,6 +941,9 @@ end
  
 
  configure_blacklight do |config|
+    # Use only the main index partial to prevent duplicate title/thumbnail rendering
+    # since we have moved them inside the main card design in _index_list_default.html.erb
+    config.index.partials = [:index]
    #config.view.gallery.partials = [:index_header, :index]
    config.view.masonry.partials = [:index]
    config.view.slideshow.partials = [:index]

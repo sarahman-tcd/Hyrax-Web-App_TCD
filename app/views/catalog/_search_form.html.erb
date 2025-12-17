@@ -148,6 +148,29 @@ document.addEventListener("turbolinks:load", function () {
       const simplePanel = document.querySelector(".simple-search-panel");
       const toggleSimpleSearch = document.getElementById("toggle-simple-search");
       
+      // Function to clear advanced search state from localStorage
+      function clearAdvancedSearchState() {
+          localStorage.removeItem("savedSearchFields");
+          localStorage.removeItem("advancedPanelState");
+          localStorage.removeItem("savedTimeRange");
+      }
+
+      // Clear advanced search state when Simple Search button is clicked
+      const simpleSearchButton = document.getElementById("search-submit-header");
+      if (simpleSearchButton) {
+          simpleSearchButton.addEventListener("click", clearAdvancedSearchState);
+      }
+
+      // Clear advanced search state when Enter is pressed in Simple Search input
+      const simpleSearchInput = document.getElementById("search-field-header");
+      if (simpleSearchInput) {
+          simpleSearchInput.addEventListener("keypress", function(e) {
+              if (e.key === 'Enter' || e.keyCode === 13) {
+                  clearAdvancedSearchState();
+              }
+          });
+      }
+      
 
       toggleAdvancedSearch.addEventListener("click", function() {
           $('#advance-search-option').hide();
