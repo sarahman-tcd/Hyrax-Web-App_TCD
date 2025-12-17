@@ -378,12 +378,125 @@
     mergeFacets(".blacklight-creator_sim", ".blacklight-contributor_sim", "blacklight-creator_contributor", "Creator/Contributor");
   }
 
+  // Highlighting Logic
+  function highlightSearchTerms() {
+      const urlParams = new URLSearchParams(window.location.search);
+      let terms = [];
+
+      // 1. Get terms from 'q' parameter
+      if (urlParams.has('q')) {
+          const q = urlParams.get('q');
+          
+          // Better parsing for Solr queries
+          // 1. Split by space, but respect quotes
+          const parts = q.match(/(?:[^\s"]+|"[^"]*")+/g) || [];
+          
+          parts.forEach(part => {
+              // Check if it's a field search (field:value)
+              if (part.includes(':')) {
+                  // Extract value after the last colon (handle cases like field:"val:ue")
+                  let value = part.substring(part.indexOf(':') + 1);
+                  
+                  // Ignore range queries (e.g. [1900 TO 2000])
+                  if (value.startsWith('[') || value.startsWith('{')) return;
+                  
+                  part = value;
+              }
+              
+              // Clean up the term
+              // Remove quotes, wildcards, parentheses, and fuzzy/boost operators
+              let clean = part.replace(/["'*()^~]/g, '');
+              
+              // Filter out boolean operators and common stop words
+              if (clean.length > 2 && !['AND', 'OR', 'NOT', 'TO', 'in', 'for'].includes(clean)) {
+                  terms.push(clean);
+              }
+          });
+      }
+
+      // 2. Get terms from advanced search fields (f params are usually facets, but advanced search might use others)
+      // In this app, advanced search seems to construct a complex 'q'. 
+      // But if there are other params, we could check them. 
+      // For now, parsing 'q' is the most reliable way as it contains the actual query sent to Solr.
+
+      if (terms.length === 0) return;
+
+      // Unique terms
+      terms = [...new Set(terms)];
+
+      // 3. Highlight in DOM
+      const cards = document.querySelectorAll('.ajax-result-card');
+      cards.forEach(card => {
+          const walker = document.createTreeWalker(card, NodeFilter.SHOW_TEXT, null, false);
+          let node;
+          const nodesToReplace = [];
+
+          while (node = walker.nextNode()) {
+              // Skip if already highlighted or in script/style
+              if (node.parentNode.classList.contains('search-highlight') || 
+                  ['SCRIPT', 'STYLE'].includes(node.parentNode.tagName)) continue;
+
+              let text = node.nodeValue;
+              let hasMatch = false;
+
+              // Check for matches
+              terms.forEach(term => {
+                  // Escape special regex characters in the term
+                  const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                  // Match whole words only to avoid partial highlighting of unrelated words
+                  // But allow for partial matches if the user searched for a wildcard? 
+                  // User request: "Whatever Search Term is seached by user will be heighlighted"
+                  // Usually highlighting works on whole words or significant parts.
+                  // Let's stick to case-insensitive match, but maybe boundary check?
+                  // If I search "photo", I expect "photograph" to highlight "photo"? 
+                  // Or "photograph" to be highlighted?
+                  // Let's use the term as is.
+                  const regex = new RegExp(`(${escapedTerm})`, 'gi');
+                  if (regex.test(text)) {
+                      hasMatch = true;
+                  }
+              });
+
+              if (hasMatch) {
+                  nodesToReplace.push(node);
+              }
+          }
+
+          // Replace nodes
+          nodesToReplace.forEach(node => {
+              let html = node.nodeValue;
+              terms.forEach(term => {
+                  const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                  const regex = new RegExp(`(${escapedTerm})`, 'gi');
+                  html = html.replace(regex, '<span class="search-highlight">$1</span>');
+              });
+              
+              const span = document.createElement('span');
+              span.innerHTML = html;
+              node.parentNode.replaceChild(span, node);
+          });
+      });
+  }
+
   // Run on initial page load
-  document.addEventListener("DOMContentLoaded", applyFacetMerging);
+  document.addEventListener("DOMContentLoaded", () => {
+      applyFacetMerging();
+      highlightSearchTerms();
+  });
 
   // Re-run on AJAX navigation (Blacklight uses Turbolinks/AJAX)
-  document.addEventListener("turbolinks:load", applyFacetMerging);
-  document.addEventListener("ajax:success", applyFacetMerging);
+  document.addEventListener("turbolinks:load", () => {
+      applyFacetMerging();
+      highlightSearchTerms();
+  });
+  
+  document.addEventListener("ajax:success", (event) => {
+      // Small delay to ensure DOM is updated
+      setTimeout(() => {
+          applyFacetMerging();
+          highlightSearchTerms();
+      }, 100);
+  });
 </script>
 
 

@@ -148,3 +148,12 @@
         max-width: 150px;
     }
 }
+
+/* Search Term Highlight */
+.search-highlight {
+    background-color: #fff3cd;
+    color: #856404;
+    font-weight: bold;
+    padding: 0 2px;
+    border-radius: 2px;
+}
