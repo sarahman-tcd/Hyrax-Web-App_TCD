@@ -19,38 +19,40 @@
         <%= link_to document.title_or_label, url_for_document(document) %>
       </h3>
 
-      <div class="ajax-metadata">
+      <%# Abstract (Max 2 lines, grey) %>
+      <% if document['abstract_tesim'].present? %>
+        <div class="ajax-abstract" title="<%= document['abstract_tesim'].join(' ') %>">
+          <%= document['abstract_tesim'].join(' ') %>
+        </div>
+      <% end %>
+
+      <div class="ajax-metadata ajax-meta-grid">
         <% doc_presenter = index_presenter(document) %>
         
-        <%# Creator %>
-        <% if document['creator_tesim'].present? %>
-          <div class="ajax-meta-row">
-            <span class="ajax-label">Creator:</span>
-            <span class="ajax-value truncate-3-lines" title="<%= document['creator_tesim'].join(', ') %>">
-              <%= document['creator_tesim'].join(', ') %>
-            </span>
-          </div>
+        <%# Helper to render a row %>
+        <% render_row = proc do |label, field| %>
+          <% if document[field].present? %>
+            <div class="ajax-meta-row">
+              <span class="ajax-label"><%= label %>:</span>
+              <span class="ajax-value truncate-1-line" title="<%= document[field].join(', ') %>">
+                <%= document[field].join(', ') %>
+              </span>
+            </div>
+          <% end %>
         <% end %>
 
-        <%# Date Created %>
-        <% if document['date_created_tesim'].present? %>
-          <div class="ajax-meta-row">
-            <span class="ajax-label">Date Created:</span>
-            <span class="ajax-value truncate-3-lines" title="<%= document['date_created_tesim'].join(', ') %>">
-              <%= document['date_created_tesim'].join(', ') %>
-            </span>
-          </div>
-        <% end %>
-
-        <%# Resource Type %>
-        <% if document['resource_type_tesim'].present? %>
-          <div class="ajax-meta-row">
-            <span class="ajax-label">Resource Type:</span>
-            <span class="ajax-value truncate-3-lines" title="<%= document['resource_type_tesim'].join(', ') %>">
-              <%= document['resource_type_tesim'].join(', ') %>
-            </span>
-          </div>
-        <% end %>
+        <%# Render Fields in Grid %>
+        <% render_row.call('Creator', 'creator_tesim') %>
+        <% render_row.call('Contributor', 'contributor_tesim') %>
+        <% render_row.call('Keyword', 'keyword_tesim') %>
+        <% render_row.call('Subject', 'subject_tesim') %>
+        <% render_row.call('Publisher', 'publisher_tesim') %>
+        <% render_row.call('Identifier', 'identifier_tesim') %>
+        <% render_row.call('Copyright', 'copyright_note_tesim') %>
+        <% render_row.call('DOI', 'digital_object_identifier_tesim') %>
+        <% render_row.call('Date', 'date_created_tesim') %>
+        <% render_row.call('Type', 'resource_type_tesim') %>
+      </div>
 
         <%# Collection Counts & Tile Order (Preserved from original) %>
         <% if(doc_presenter.field_value('has_model_ssim') == 'Collection') %>
@@ -76,6 +78,6 @@
       </div>
     </div>
   </div>
-</div>
+
 
 
