@@ -7,7 +7,7 @@
           <%= text_field_tag :q, current_search_parameters, class: "q form-control", id: "search-field-header", placeholder: "Search Entire Collection" %>
           
           <i class="fa fa-info-circle" data-toggle="tooltip" title="Please avoid using special characters (e.g., @, #, $, %, &, -, +, *)"
-            style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #6a6a6a8f; z-index: 100;font-size: large;"></i>
+            style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #6a6a6a8f; z-index: 100;font-size: medium;"></i>
         </div>
         <button type="submit" class="search-button" id="search-submit-header" data-toggle="tooltip" title="Search">
           <i class="fa fa-search"></i>
@@ -771,8 +771,9 @@ document.addEventListener("turbolinks:load", function () {
         // Apply correct formatting based on the operator
         // Handle multi-word queries and operators properly
         if (operator === 'contains') {
-            // For contains: just wrap in wildcards (don't use quotes for multi-word)
-            query = `*${query}*`;
+            // For contains: we use a combined approach (term OR *term*)
+            // This allows stemming to work (via 'term') AND substring matching (via '*term*')
+            // query is processed per-word below
         } else if (operator === 'starts_with') {
             // For starts_with: do NOT add wildcard here, it's added later
             // But we DO need to escape spaces for Solr string fields
@@ -821,9 +822,10 @@ document.addEventListener("turbolinks:load", function () {
             
             if (operator === 'contains') {
                 // Split into words and search each word across all fields
+                // Logic: (field:word OR field:*word*)
                 const words = query.trim().split(/\s+/);
                 const wordQueries = words.map(word => {
-                    const fieldQueries = allFields.map(f => `${f}:*${word}*`).join(' OR ');
+                    const fieldQueries = allFields.map(f => `(${f}:${word} OR ${f}:*${word}*)`).join(' OR ');
                     return `(${fieldQueries})`;
                 });
                 queryPart = wordQueries.join(' AND ');
@@ -847,7 +849,7 @@ document.addEventListener("turbolinks:load", function () {
             if (operator === 'contains') {
                 const words = query.replace(/\*/g, '').trim().split(/\s+/);
                 const wordQueries = words.map(word => 
-                    `(contributor_tesim:*${word}* OR creator_tesim:*${word}*)`
+                    `((contributor_tesim:${word} OR contributor_tesim:*${word}*) OR (creator_tesim:${word} OR creator_tesim:*${word}*))`
                 );
                 queryPart = wordQueries.join(' AND ');
             } else if (operator === 'starts_with') {
@@ -859,7 +861,7 @@ document.addEventListener("turbolinks:load", function () {
             if (operator === 'contains') {
                 const words = query.replace(/\*/g, '').trim().split(/\s+/);
                 const wordQueries = words.map(word => 
-                    `(keyword_tesim:*${word}* OR subject_tesim:*${word}*)`
+                    `((keyword_tesim:${word} OR keyword_tesim:*${word}*) OR (subject_tesim:${word} OR subject_tesim:*${word}*))`
                 );
                 queryPart = wordQueries.join(' AND ');
             } else if (operator === 'starts_with') {
@@ -871,7 +873,8 @@ document.addEventListener("turbolinks:load", function () {
             // Single specific field
             if (operator === 'contains') {
                 const words = query.replace(/\*/g, '').trim().split(/\s+/);
-                const wordQueries = words.map(word => `${field}:*${word}*`);
+                // Logic: (field:word OR field:*word*)
+                const wordQueries = words.map(word => `(${field}:${word} OR ${field}:*${word}*)`);
                 queryPart = `(${wordQueries.join(' AND ')})`;
             } else {
                 const searchField = getFieldForOperator(field, operator);
