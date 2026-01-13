@@ -23,8 +23,18 @@
         <div class="q-line-static " id="dynamic-search-rows">
           <div class="row search-row">
             <div class="form-group" style="padding-right:15px; padding-left:15px ">
-              <label>Created Between</label><br>
-              <canvas id="timeline-canvas" width="885" height="50" style="padding-right:5px; padding-left:0px "></canvas>
+              <div style="display: flex; align-items: center; margin-bottom: 5px;">
+                <label style="margin-bottom: 0;">Created Between</label>
+                <label class="switch" style="margin-left: 15px; margin-top: 8px;" data-toggle="tooltip" title="Enable/Disable Date Filter">
+                  <input type="checkbox" id="date-toggle" checked>
+                  <span class="slider round"></span>
+                </label>
+              </div>
+              <div class="timeline-wrapper" style="position: relative; width: 100%; margin-top: 20px; margin-bottom: 20px;">
+                <canvas id="timeline-canvas" height="50"></canvas>
+                <div id="start-year-label" class="year-label" style="position: absolute; top: -20px; transform: translateX(-50%); cursor: pointer; color: white; font-weight: bolder; font-size: 14px; white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,0.5); z-index: 10;"></div>
+                <div id="end-year-label" class="year-label" style="position: absolute; top: -20px; transform: translateX(-50%); cursor: pointer; color: white; font-weight: bolder; font-size: 14px; white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,0.5); z-index: 10;"></div>
+              </div>
             </div>
 
             <br><br>
@@ -251,6 +261,13 @@ document.addEventListener("turbolinks:load", function () {
           $('#advance-search-option').hide();
           simplePanel.style.display = "none";
           advancedPanel.style.display = 'block';
+          
+          // Ensure timeline is correctly sized and drawn when panel is opened
+          setTimeout(() => {
+              syncCanvasSize();
+              drawSlider();
+              updateHTMLLabels();
+          }, 10);
       });
 
       toggleSimpleSearch.addEventListener("click", function() {
@@ -356,9 +373,9 @@ document.addEventListener("turbolinks:load", function () {
       const compressionFactor = 0.15; // How much to compress older years (0-1, lower = more compression)
       const expansionFactor = 0.65; // How much of the slider to use for recent years (1800+)
 
-      // Get the actual rendered width of the canvas
+      // Get the actual internal width of the canvas
       function getCanvasWidth() {
-          return canvas.getBoundingClientRect().width || canvas.width;
+          return canvas.width || 885;
       }
 
       // Convert year to slider position (non-linear)
@@ -411,24 +428,29 @@ document.addEventListener("turbolinks:load", function () {
           }
       }
 
-      // Initialize pointers at the middle range
+      // Source of truth for years
+      let currentStartYear = initialStartYear;
+      let currentEndYear = initialEndYear;
+
+      // Initialize pointers
       const startPointer = {
-          x: yearToPosition(initialStartYear),
+          x: 0,
           y: 25,
-          label: initialStartYear < 0 ? Math.abs(initialStartYear) + " BCE" : initialStartYear+ " CE",
+          label: ""
       };
     
       const endPointer = {
-          x: yearToPosition(initialEndYear),
+          x: 0,
           y: 25,
-          label: initialEndYear < 0 ? Math.abs(initialEndYear) + " BCE" : initialEndYear + " CE",
+          label: ""
       };
 
-      function updateYearLabels() {
-          // Calculate the start and end year based on the pointer positions
-          const startYear = positionToYear(startPointer.x);
-          const endYear = positionToYear(endPointer.x);
+      function updatePointersFromYears() {
+          startPointer.x = yearToPosition(currentStartYear);
+          endPointer.x = yearToPosition(currentEndYear);
+      }
 
+      function updateYearLabels() {
           // Function to format the year as BCE or CE
           function formatYear(year) {
               if (year <= 0) {
@@ -439,26 +461,44 @@ document.addEventListener("turbolinks:load", function () {
           }
 
           // Update the labels to show the formatted years
-          startPointer.label = formatYear(startYear);
-          endPointer.label = formatYear(endYear);
+          startPointer.label = formatYear(currentStartYear);
+          endPointer.label = formatYear(currentEndYear);
       }
 
 
       function drawSlider() {
+          const isEnabled = document.getElementById('date-toggle').checked;
+          
+          // Ensure internal dimensions match rendered dimensions for 1:1 mapping
+          const rect = canvas.getBoundingClientRect();
+          if (rect.width > 0 && canvas.width !== Math.round(rect.width)) {
+              canvas.width = Math.round(rect.width);
+              canvas.height = 50;
+              updatePointersFromYears();
+          }
+
           ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+          if (!isEnabled) {
+              ctx.globalAlpha = 0.4;
+          } else {
+              ctx.globalAlpha = 1.0;
+          }
+
           // Draw timeline background for the entire slider
-          const radius = 6; // Adjust this value for more or less rounding
+          const trackHeight = 12;
+          const trackY = startPointer.y - 5;
+          const radius = 6;
 
           ctx.fillStyle = "#f0f0f0"; // Light gray background outside the range
           
-          // Draw rounded rectangle manually
+          // Draw rounded track background
           ctx.beginPath();
-          ctx.moveTo(radius, startPointer.y - 5); // Start from the left rounded corner
-          ctx.lineTo(canvas.width - radius, startPointer.y - 5); // Top edge
-          ctx.arc(canvas.width - radius, startPointer.y + 1, radius, Math.PI * 1.5, Math.PI * 0.5, false); // Right rounded edge
-          ctx.lineTo(radius, startPointer.y + 7); // Bottom edge
-          ctx.arc(radius, startPointer.y + 1, radius, Math.PI * 0.5, Math.PI * 1.5, false); // Left rounded edge
+          ctx.moveTo(radius, trackY);
+          ctx.lineTo(canvas.width - radius, trackY);
+          ctx.arc(canvas.width - radius, trackY + radius, radius, Math.PI * 1.5, Math.PI * 0.5, false);
+          ctx.lineTo(radius, trackY + trackHeight);
+          ctx.arc(radius, trackY + radius, radius, Math.PI * 0.5, Math.PI * 1.5, false);
           ctx.closePath();
           ctx.fill();
           
@@ -469,7 +509,9 @@ document.addEventListener("turbolinks:load", function () {
           gradient.addColorStop(0.5, "#4facfe");  // Blue
           gradient.addColorStop(1, "#00f2fe");    // Cyan
           ctx.fillStyle = gradient;
-          ctx.fillRect(startPointer.x, startPointer.y - 5, endPointer.x - startPointer.x, 12);
+          ctx.beginPath();
+          ctx.rect(startPointer.x, trackY, endPointer.x - startPointer.x, trackHeight);
+          ctx.fill();
 
           // Draw start pointer with gradient
           const startGradient = ctx.createRadialGradient(startPointer.x, startPointer.y, 0, startPointer.x, startPointer.y, 10);
@@ -499,41 +541,110 @@ document.addEventListener("turbolinks:load", function () {
           ctx.lineWidth = 2;
           ctx.stroke();
 
-          // Draw labels
-          ctx.fillStyle = "#fff";
-          ctx.font = "bolder 14px Arial";
+          // Draw labels - REMOVED from canvas, now using HTML
+      }
 
-          const textPadding = 5; // Padding to prevent edge clipping
-          const minLabelSpacing = 20; // Minimum distance between labels
+      function updateHTMLLabels() {
+          const startLabel = document.getElementById('start-year-label');
+          const endLabel = document.getElementById('end-year-label');
+          if (!startLabel || !endLabel) return;
 
-          // Measure text widths
-          const textWidthStart = ctx.measureText(startPointer.label).width;
-          const textWidthEnd = ctx.measureText(endPointer.label).width;
+          const renderedWidth = canvas.getBoundingClientRect().width;
+          if (renderedWidth <= 0) return;
+          
+          let startX = startPointer.x;
+          let endX = endPointer.x;
 
-          // Default positions
-          let startX = startPointer.x - textWidthStart / 2;
-          let endX = endPointer.x - textWidthEnd / 2;
+          startLabel.innerHTML = startPointer.label;
+          endLabel.innerHTML = endPointer.label;
 
-          // Prevent labels from going outside the div
-          if (startX < textPadding) startX = textPadding;
-          if (startX + textWidthStart > canvas.width - textPadding) startX = canvas.width - textWidthStart - textPadding;
+          // Boundary checks to prevent labels from going off-screen
+          const startWidth = startLabel.offsetWidth;
+          const endWidth = endLabel.offsetWidth;
+          const halfStart = startWidth / 2;
+          const halfEnd = endWidth / 2;
 
-          if (endX < textPadding) endX = textPadding;
-          if (endX + textWidthEnd > canvas.width - textPadding) endX = canvas.width - textWidthEnd - textPadding;
+          if (startX - halfStart < 0) startX = halfStart;
+          if (startX + halfStart > renderedWidth) startX = renderedWidth - halfStart;
 
-          // **Avoid Overlapping Labels**
-          if (endX < startX + textWidthStart + minLabelSpacing) {
-              let overlapAdjustment = (startX + textWidthStart + minLabelSpacing) - endX;
-              endX += overlapAdjustment / 2;
-              startX -= overlapAdjustment / 2;
+          if (endX - halfEnd < 0) endX = halfEnd;
+          if (endX + halfEnd > renderedWidth) endX = renderedWidth - halfEnd;
+
+          startLabel.style.left = startX + 'px';
+          endLabel.style.left = endX + 'px';
+
+          // Handle overlap
+          const startRect = startLabel.getBoundingClientRect();
+          const endRect = endLabel.getBoundingClientRect();
+          const minSpacing = 10;
+
+          if (startX + startRect.width/2 + minSpacing > endX - endRect.width/2) {
+              const overlap = (startX + startRect.width/2 + minSpacing) - (endX - endRect.width/2);
+              startLabel.style.left = (startX - overlap/2) + 'px';
+              endLabel.style.left = (endX + overlap/2) + 'px';
+          }
+      }
+
+      function makeLabelEditable(labelId, pointer) {
+          const label = document.getElementById(labelId);
+          if (!label || label.querySelector('input')) return;
+
+          const currentYear = (pointer === startPointer) ? currentStartYear : currentEndYear;
+          const yearNum = Math.abs(currentYear);
+          const suffix = currentYear <= 0 ? " BCE" : " CE";
+
+          const input = document.createElement('input');
+          input.type = 'text';
+          input.className = 'year-edit-input';
+          input.value = yearNum;
+
+          label.innerHTML = '';
+          label.appendChild(input);
+          input.focus();
+          input.select();
+
+          function saveEdit() {
+              let newYearNum = parseInt(input.value);
+              if (isNaN(newYearNum)) {
+                  newYearNum = yearNum;
+              }
+
+              // Apply the same BCE/CE logic
+              let newYear = (pointer === startPointer ? currentStartYear : currentEndYear) <= 0 ? -newYearNum : newYearNum;
+              
+              // Validate range
+              if (newYear < minYear) newYear = minYear;
+              if (newYear > maxYear) newYear = maxYear;
+
+              // Ensure pointers don't cross
+              if (pointer === startPointer) {
+                  if (newYear >= currentEndYear) newYear = currentEndYear - 1;
+                  currentStartYear = newYear;
+              } else {
+                  if (newYear <= currentStartYear) newYear = currentStartYear + 1;
+                  currentEndYear = newYear;
+              }
+
+              updatePointersFromYears();
+              updateYearLabels();
+              drawSlider();
+              updateHTMLLabels();
           }
 
-          // Draw text after adjustments
-          ctx.fillText(startPointer.label, startX, startPointer.y - 15);
-          ctx.fillText(endPointer.label, endX, endPointer.y - 15);
-
-
+          input.addEventListener('blur', saveEdit);
+          input.addEventListener('keypress', function(e) {
+              if (e.key === 'Enter') {
+                  input.blur();
+              }
+              // Only allow numbers
+              if (!/[0-9]/.test(e.key)) {
+                  e.preventDefault();
+              }
+          });
       }
+
+      document.getElementById('start-year-label').addEventListener('click', () => makeLabelEditable('start-year-label', startPointer));
+      document.getElementById('end-year-label').addEventListener('click', () => makeLabelEditable('end-year-label', endPointer));
 
 
       function dragPointer(e, pointer) {
@@ -542,6 +653,7 @@ document.addEventListener("turbolinks:load", function () {
           const maxLeft = getCanvasWidth();
 
           function onMouseMove(event) {
+              const rect = canvas.getBoundingClientRect();
               let newX = event.clientX - rect.left;
               newX = Math.min(Math.max(newX, minLeft), maxLeft);
 
@@ -550,16 +662,19 @@ document.addEventListener("turbolinks:load", function () {
                   if (newX >= endX) {
                       newX = endX - 1;
                   }
+                  currentStartYear = positionToYear(newX);
               } else {
                   const startX = startPointer.x;
                   if (newX <= startX) {
                       newX = startX + 1;
                   }
+                  currentEndYear = positionToYear(newX);
               }
 
-              pointer.x = newX;
+              updatePointersFromYears();
               updateYearLabels();
               drawSlider();
+              updateHTMLLabels();
           }
 
           function onMouseUp() {
@@ -572,8 +687,12 @@ document.addEventListener("turbolinks:load", function () {
       }
 
       canvas.addEventListener("mousedown", function(e) {
-          const distStart = Math.abs(e.clientX - canvas.getBoundingClientRect().left - startPointer.x);
-          const distEnd = Math.abs(e.clientX - canvas.getBoundingClientRect().left - endPointer.x);
+          if (!document.getElementById('date-toggle').checked) return;
+          const rect = canvas.getBoundingClientRect();
+          const mouseX = e.clientX - rect.left;
+          
+          const distStart = Math.abs(mouseX - startPointer.x);
+          const distEnd = Math.abs(mouseX - endPointer.x);
 
           if (distStart < distEnd) {
               dragPointer(e, startPointer);
@@ -584,25 +703,24 @@ document.addEventListener("turbolinks:load", function () {
 
       // Sync canvas internal width with rendered width for proper scaling
       function syncCanvasSize() {
-          const renderedWidth = canvas.getBoundingClientRect().width;
-          if (renderedWidth && renderedWidth > 0 && renderedWidth !== canvas.width) {
-              // Get current year values before resizing
-              const startYear = positionToYear(startPointer.x);
-              const endYear = positionToYear(endPointer.x);
+          const rect = canvas.getBoundingClientRect();
+          const renderedWidth = rect.width;
+          if (renderedWidth && renderedWidth > 0 && (canvas.width !== Math.round(renderedWidth) || canvas.height !== 50)) {
+              // Update canvas internal dimensions
+              canvas.width = Math.round(renderedWidth);
+              canvas.height = 50;
               
-              // Update canvas internal width (this resets the context)
-              canvas.width = renderedWidth;
-              
-              // Recalculate pointer positions with new width
-              startPointer.x = yearToPosition(startYear);
-              endPointer.x = yearToPosition(endYear);
+              // Recalculate pointer positions from years
+              updatePointersFromYears();
           }
       }
 
       // Initial setup
       syncCanvasSize();
+      updatePointersFromYears();
       updateYearLabels();
       drawSlider();
+      updateHTMLLabels();
 
       // Handle window resize
       let resizeTimeout;
@@ -611,8 +729,18 @@ document.addEventListener("turbolinks:load", function () {
           resizeTimeout = setTimeout(function() {
               syncCanvasSize();
               drawSlider();
+              updateHTMLLabels();
           }, 100);
       });
+
+      // Redraw slider when toggle changes
+      const dateToggle = document.getElementById('date-toggle');
+      if (dateToggle) {
+          dateToggle.addEventListener('change', function() {
+              drawSlider();
+              updateHTMLLabels();
+          });
+      }
 
       const searchButton = document.getElementById('search-button');
       const rowsContainer = document.getElementById('dynamic-search-rows');
@@ -621,7 +749,13 @@ document.addEventListener("turbolinks:load", function () {
         const savedSearchFields = localStorage.getItem("savedSearchFields");
         const savedPanelState = localStorage.getItem("advancedPanelState");
         const savedTimeRange = localStorage.getItem("savedTimeRange");
+        const savedDateToggleState = localStorage.getItem("dateToggleState");
     
+        // Restore date toggle state
+        if (savedDateToggleState) {
+            document.getElementById('date-toggle').checked = (savedDateToggleState === "enabled");
+        }
+
         // Restore search fields values
         if (savedSearchFields) {
             const searchFieldsData = JSON.parse(savedSearchFields);
@@ -671,14 +805,15 @@ document.addEventListener("turbolinks:load", function () {
         if (savedTimeRange) {
             const [startYear, endYear] = JSON.parse(savedTimeRange);
     
-            // Update the pointers based on saved values using non-linear scale
-            startPointer.x = yearToPosition(startYear);
-            endPointer.x = yearToPosition(endYear);
-    
-            // Update labels and redraw the slider
+            currentStartYear = startYear;
+            currentEndYear = endYear;
+
+            // Update pointers and labels
+            updatePointersFromYears();
             updateYearLabels();
-            drawSlider();
         }
+        drawSlider();
+        updateHTMLLabels();
     }
     
     // Function to extract the correct year value from the label
@@ -743,11 +878,12 @@ document.addEventListener("turbolinks:load", function () {
       localStorage.setItem("savedSearchFields", JSON.stringify(searchFieldsData));
   
       // Save time range values
-      const startPointerLabel= extractYearFromLabel(startPointer.label);
-      const endPointerLabel= extractYearFromLabel(endPointer.label);
-      const savedTimeRange = JSON.stringify([startPointerLabel, endPointerLabel]);
+      const savedTimeRange = JSON.stringify([currentStartYear, currentEndYear]);
       localStorage.setItem("savedTimeRange", savedTimeRange);
   
+      // Save date toggle state
+      localStorage.setItem("dateToggleState", document.getElementById('date-toggle').checked ? "enabled" : "disabled");
+
       // Save advanced panel state
       localStorage.setItem("advancedPanelState", advancedPanel.style.display === "block" ? "open" : "closed");
     }
@@ -782,6 +918,18 @@ document.addEventListener("turbolinks:load", function () {
             // For exact: always wrap in quotes
             query = `"${query}"`;
         }
+
+        // Helper to expand plural words (Safe S-Removal)
+        const expandPlurals = (word, fieldName) => {
+            // Logic: length > 3, ends in 's', but not 'ss'
+            if (word.length > 3 && word.toLowerCase().endsWith('s') && !word.toLowerCase().endsWith('ss')) {
+                const singular = word.slice(0, -1);
+                // Return expanded query: (field:word OR field:*word*) OR (field:singular OR field:*singular*)
+                return `((${fieldName}:${word} OR ${fieldName}:*${word}*) OR (${fieldName}:${singular} OR ${fieldName}:*${singular}*))`;
+            }
+            // Default: just standard term + wildcard
+            return `(${fieldName}:${word} OR ${fieldName}:*${word}*)`;
+        };
 
         let queryPart;
         
@@ -822,10 +970,9 @@ document.addEventListener("turbolinks:load", function () {
             
             if (operator === 'contains') {
                 // Split into words and search each word across all fields
-                // Logic: (field:word OR field:*word*)
                 const words = query.trim().split(/\s+/);
                 const wordQueries = words.map(word => {
-                    const fieldQueries = allFields.map(f => `(${f}:${word} OR ${f}:*${word}*)`).join(' OR ');
+                    const fieldQueries = allFields.map(f => expandPlurals(word, f)).join(' OR ');
                     return `(${fieldQueries})`;
                 });
                 queryPart = wordQueries.join(' AND ');
@@ -848,9 +995,11 @@ document.addEventListener("turbolinks:load", function () {
         else if (field === "contributor_tesim") {
             if (operator === 'contains') {
                 const words = query.replace(/\*/g, '').trim().split(/\s+/);
-                const wordQueries = words.map(word => 
-                    `((contributor_tesim:${word} OR contributor_tesim:*${word}*) OR (creator_tesim:${word} OR creator_tesim:*${word}*))`
-                );
+                const wordQueries = words.map(word => {
+                    const contQuery = expandPlurals(word, 'contributor_tesim');
+                    const creatQuery = expandPlurals(word, 'creator_tesim');
+                    return `(${contQuery} OR ${creatQuery})`;
+                });
                 queryPart = wordQueries.join(' AND ');
             } else if (operator === 'starts_with') {
                 queryPart = `(contributor_sim:${query}* OR creator_sim:${query}*)`;
@@ -860,9 +1009,11 @@ document.addEventListener("turbolinks:load", function () {
         } else if (field === "keyword_tesim") {
             if (operator === 'contains') {
                 const words = query.replace(/\*/g, '').trim().split(/\s+/);
-                const wordQueries = words.map(word => 
-                    `((keyword_tesim:${word} OR keyword_tesim:*${word}*) OR (subject_tesim:${word} OR subject_tesim:*${word}*))`
-                );
+                const wordQueries = words.map(word => {
+                    const keyQuery = expandPlurals(word, 'keyword_tesim');
+                    const subQuery = expandPlurals(word, 'subject_tesim');
+                    return `(${keyQuery} OR ${subQuery})`;
+                });
                 queryPart = wordQueries.join(' AND ');
             } else if (operator === 'starts_with') {
                 queryPart = `(keyword_sim:${query}* OR subject_sim:${query}*)`;
@@ -873,8 +1024,7 @@ document.addEventListener("turbolinks:load", function () {
             // Single specific field
             if (operator === 'contains') {
                 const words = query.replace(/\*/g, '').trim().split(/\s+/);
-                // Logic: (field:word OR field:*word*)
-                const wordQueries = words.map(word => `(${field}:${word} OR ${field}:*${word}*)`);
+                const wordQueries = words.map(word => expandPlurals(word, field));
                 queryPart = `(${wordQueries.join(' AND ')})`;
             } else {
                 const searchField = getFieldForOperator(field, operator);
@@ -891,16 +1041,19 @@ document.addEventListener("turbolinks:load", function () {
         combinedQuery += queryPart;
       });
   
-      // Fetch time range values from the timeline slider
-      const startYear = extractYearFromLabel(startPointer.label);
-      const endYear = extractYearFromLabel(endPointer.label);
-  
-      if (combinedQuery) {
-          combinedQuery += " AND ";
+      // Fetch time range values from the timeline slider if enabled
+      const dateEnabled = document.getElementById('date-toggle').checked;
+      if (dateEnabled) {
+          const startYear = currentStartYear;
+          const endYear = currentEndYear;
+      
+          if (combinedQuery) {
+              combinedQuery += " AND ";
+          }
+      
+          // Append time range filter to query (include records without dates)
+          combinedQuery += `(date_created_tesim:[${startYear} TO ${endYear}] OR (*:* NOT date_created_tesim:*))`;
       }
-  
-      // Append time range filter to query (include records without dates)
-      combinedQuery += `(date_created_tesim:[${startYear} TO ${endYear}] OR (*:* NOT date_created_tesim:*))`;
   
       return new URLSearchParams({ q: combinedQuery }).toString();
   }
@@ -971,6 +1124,10 @@ document.addEventListener("turbolinks:load", function () {
         localStorage.removeItem("savedSearchFields");
         localStorage.removeItem("savedTimeRange");
         localStorage.removeItem("advancedPanelState");
+        localStorage.removeItem("dateToggleState");
+
+        // Reset date toggle to enabled
+        document.getElementById('date-toggle').checked = true;
 
         // Optionally clear the search fields (if needed)
         document.querySelectorAll(".search-row").forEach((row) => {
@@ -985,6 +1142,7 @@ document.addEventListener("turbolinks:load", function () {
         endPointer.x = yearToPosition(initialEndYear);
         updateYearLabels();
         drawSlider();
+        updateHTMLLabels();
 
         // Reset the panel to the simple view
         advancedPanel.style.display = 'none';
@@ -1140,9 +1298,94 @@ document.addEventListener("turbolinks:load", function () {
 
   #timeline-canvas {
     width: 100%;         
-    height: auto;        
+    height: 50px; /* Fixed height to eliminate distortion */
     display: block;      
     max-width: 100%;    
-    padding-right: 15px;
-    padding-left: 15px;
+  }
+
+  .timeline-wrapper {
+    /* Rely on parent padding for alignment */
+  }
+
+  /* Modern Toggle Switch */
+  .switch {
+    position: relative;
+    display: inline-block;
+    width: 34px;
+    height: 18px;
+  }
+
+  .switch input { 
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    -webkit-transition: .4s;
+    transition: .4s;
+  }
+
+  .slider:before {
+    position: absolute;
+    content: "";
+    height: 14px;
+    width: 14px;
+    left: 2px;
+    bottom: 2px;
+    background-color: white;
+    -webkit-transition: .4s;
+    transition: .4s;
+  }
+
+  input:checked + .slider {
+    background-color: #2196F3;
+  }
+
+  input:focus + .slider {
+    box-shadow: 0 0 1px #2196F3;
+  }
+
+  input:checked + .slider:before {
+    -webkit-transform: translateX(16px);
+    -ms-transform: translateX(16px);
+    transform: translateX(16px);
+  }
+
+  /* Rounded sliders */
+  .slider.round {
+    border-radius: 18px;
+  }
+
+  .slider.round:before {
+    border-radius: 50%;
+  }
+
+  .year-label:hover {
+    text-decoration: underline;
+    color: #ffeb3b !important; /* Slight yellow on hover to indicate clickability */
+  }
+
+  .year-edit-input {
+    width: 60px;
+    height: 22px;
+    background: white;
+    border: 1px solid #4facfe;
+    border-radius: 4px;
+    color: #333;
+    font-weight: bold;
+    text-align: center;
+    font-size: 13px;
+    padding: 0;
+    margin: 0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    outline: none;
+  }
 </style>
