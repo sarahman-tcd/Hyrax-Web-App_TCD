@@ -1,0 +1,159 @@
+/* Modern Search Results Card Design */
+.ajax-result-card {
+    background: #fff;
+    border: 1px solid #e1e4e8;
+    border-radius: 6px;
+    padding: 20px;
+    margin-bottom: 16px;
+    transition: all 0.2s ease-in-out;
+    display: flex;
+    align-items: flex-start;
+}
+
+.ajax-result-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(149, 157, 165, 0.2);
+    border-color: #d1d5da;
+}
+
+.ajax-thumbnail-container {
+    flex: 0 0 100px;
+    margin-right: 20px;
+}
+
+.ajax-thumbnail {
+    width: 100%;
+    height: auto;
+    border-radius: 4px;
+    border: 1px solid #eaecef;
+    display: block;
+}
+
+.ajax-content {
+    flex: 1;
+    min-width: 0;
+    /* Fix for flexbox truncation */
+}
+
+.ajax-title {
+    margin: 0 0 8px 0;
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.ajax-title a {
+    color: #1074b7;
+    text-decoration: none;
+}
+
+.ajax-title a:hover {
+    text-decoration: underline;
+}
+
+.ajax-meta-row {
+    display: flex;
+    margin-bottom: 4px;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.ajax-label {
+    flex: 0 0 120px;
+    font-weight: 600;
+    color: #586069;
+}
+
+.ajax-value {
+    flex: 1;
+    color: #24292e;
+    min-width: 0;
+    /* Critical for truncation in flex items */
+}
+
+.truncate-3-lines {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Placeholder Thumbnail */
+.placeholder-thumbnail {
+    display: block;
+    text-align: center;
+    background: #f6f8fa;
+    border: 1px solid #eaecef;
+    border-radius: 4px;
+    height: 100px;
+    line-height: 100px;
+}
+
+.placeholder-icon {
+    font-size: 40px;
+    color: #d1d5da;
+    vertical-align: middle;
+}
+
+/* Abstract Style */
+.ajax-abstract {
+    color: #666;
+    font-size: 14px;
+    line-height: 1.5;
+    margin-bottom: 12px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Metadata Grid Layout */
+.ajax-meta-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    /* 2 columns, prevent overflow */
+    gap: 4px 20px;
+    /* row gap, column gap */
+}
+
+.ajax-meta-grid .ajax-meta-row {
+    margin-bottom: 0;
+    /* Remove bottom margin for grid items */
+    min-width: 0;
+    /* Allow flex container to shrink */
+}
+
+.truncate-1-line {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+    max-width: 100%;
+}
+
+/* Responsive: Stack grid on small screens */
+@media (max-width: 768px) {
+    .ajax-meta-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .ajax-result-card {
+        flex-direction: column;
+    }
+
+    .ajax-thumbnail-container {
+        margin-right: 0;
+        margin-bottom: 15px;
+        width: 100%;
+        max-width: 150px;
+    }
+}
+
+/* Search Term Highlight */
+.search-highlight {
+    background-color: #fff3cd;
+    color: #856404;
+    font-weight: bold;
+    padding: 0 2px;
+    border-radius: 2px;
+}

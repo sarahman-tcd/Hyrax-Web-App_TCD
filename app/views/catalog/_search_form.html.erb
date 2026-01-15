@@ -1,45 +1,1391 @@
 <%= form_tag search_form_action, method: :get, class: "form-horizontal search-form", id: "search-form-header", role: "search" do %>
-  <%= render_hash_as_hidden_fields(search_state.params_for_search.except(:q, :search_field, :qt, :page, :utf8)) %>
-  <%= hidden_field_tag :search_field, 'all_fields' %>
   <div class="form-group">
-
-    <label class="control-label col-sm-3" for="search-field-header">
-      <%= t(:'hyrax.search.button.text') %>
-    </label>
-
-    <div class="input-group">
-      <%= text_field_tag :q, current_search_parameters , class: "q form-control", id: "search-field-header", placeholder: t("hyrax.search.form.q.placeholder") %>
-
-      <div class="input-group-btn">
-        <button type="submit" class="btn btn-primary" id="search-submit-header">
-          <%= t('hyrax.search.button.html') %>
+    <h1 class="fancy-label">Explore Digital Collections</h1>
+    <div class="form-group simple-search-panel">
+      <div class="input-group full-width-search " >
+        <div style="position: relative; display: inline-block; width: 100%;">
+          <%= text_field_tag :q, current_search_parameters, class: "q form-control", id: "search-field-header", placeholder: "Search Entire Collection" %>
+          
+          <i class="fa fa-info-circle" data-toggle="tooltip" title="Please avoid using special characters (e.g., @, #, $, %, &, -, +, *)"
+            style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #6a6a6a8f; z-index: 100;font-size: medium;"></i>
+        </div>
+        <button type="submit" class="search-button" id="search-submit-header" data-toggle="tooltip" title="Search">
+          <i class="fa fa-search"></i>
         </button>
-        <% if current_user %>
-          <button class="btn btn-default dropdown-toggle" type="button" data-toggle="dropdown" aria-expanded="false">
+      </div>
+    </div>
+  </div>
 
-            <span class="sr-only" data-search-element="label"><%= t("hyrax.search.form.option.all.label_long", application_name: application_name) %></span>
-            <span aria-hidden="true"><%= t("hyrax.search.form.option.all.label_short") %></span>
-            <span class="caret"></span>
-          </button>
+ 
 
-          <ul class="dropdown-menu pull-right">
-            <li>
-              <%= link_to t("hyrax.search.form.option.all.label_long", application_name: application_name), "#",
-                  data: { "search-option" => main_app.search_catalog_path, "search-label" => t("hyrax.search.form.option.all.label_short") } %>
-            </li>
-            <li>
-              <%= link_to t("hyrax.search.form.option.my_works.label_long"), "#",
-                  data: { "search-option" => hyrax.my_works_path, "search-label" => t("hyrax.search.form.option.my_works.label_short") } %>
-            </li>
-            <li>
-              <%= link_to t("hyrax.search.form.option.my_collections.label_long"), "#",
-                  data: { "search-option" => hyrax.my_collections_path, "search-label" => t("hyrax.search.form.option.my_collections.label_short") } %>
-            </li>
-          <% end %>
+   <div class="advanced-search-panel" style="display: none;">
+      <div class="dynamic-queries-container">
+        <div class="q-line-static " id="dynamic-search-rows">
+          <div class="row search-row">
+            <div class="form-group" style="padding-right:15px; padding-left:15px ">
+              <div style="display: flex; align-items: center; margin-bottom: 5px;">
+                <label style="margin-bottom: 0;">Created Between</label>
+                <label class="switch" style="margin-left: 15px; margin-top: 8px;" data-toggle="tooltip" title="Enable/Disable Date Filter">
+                  <input type="checkbox" id="date-toggle" checked>
+                  <span class="slider round"></span>
+                </label>
+              </div>
+              <div class="timeline-wrapper" style="position: relative; width: 100%; margin-top: 20px; margin-bottom: 20px;">
+                <canvas id="timeline-canvas" height="50"></canvas>
+                <div id="start-year-label" class="year-label" style="position: absolute; top: -20px; transform: translateX(-50%); cursor: pointer; color: white; font-weight: bolder; font-size: 14px; white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,0.5); z-index: 10;"></div>
+                <div id="end-year-label" class="year-label" style="position: absolute; top: -20px; transform: translateX(-50%); cursor: pointer; color: white; font-weight: bolder; font-size: 14px; white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,0.5); z-index: 10;"></div>
+              </div>
+            </div>
 
-        </ul>
-      </div><!-- /.input-group-btn -->
-    </div><!-- /.input-group -->
+            <br><br>
+        
+            <div class="col-sm-3">
+            <select name="search_field[]" class="form-control field-dropdown">
+            <option value="any">Any Field</option>
+            <option value="abstract_tesim">Abstract</option>
+            <option value="contributor_tesim">Creator / Contributor</option>
+            <option value="copyright_note_tesim">Copyright note</option>
+            <option value="digital_object_identifier_tesim">DOI</option>
+            <option value="keyword_tesim">Keyword / Subject</option>
+            <option value="publisher_tesim">Publisher</option>
+            <option value="identifier_tesim">Shelf Mark/Reference Number</option>
+            <option value="title_tesim">Title</option>
+              </select>
+            </div>
+            <div class="col-sm-3">
+              <select name="search_operator[]" class="form-control operator-dropdown">
+                <option value="contains">Contains</option>
+                <option value="starts_with">Starts With</option>
+                <option value="equal">Exact</option>
+              </select>
+            </div>
+            <div class="col-sm-6">
+              <%= text_field_tag "search_query[]", nil, class: "q form-control", placeholder: "Search term" %>            
+            </div>
+          </div>
+        </div>
+      </div>
 
-  </div><!-- /.form-group -->
+      <div class="row">
+        <div class="col-sm-12">
+          <div class="form-group" >
+            <label  id="add-line"  class="btn clickable-add-option" data-toggle="tooltip" title="Add another search field"><i class="fa fa-plus"></i> Add New Search</label>  
+            <label id="clear-all"
+                  class="btn clickable-clear-option"
+                  data-toggle="tooltip" title="Clear all search criteria and reset the form"
+                  data-redirect-url="<%= main_app.search_catalog_path %>">
+              <i class="fa fa-refresh"></i> Clear All
+            </label>
+            <label class="btn clickable-add-option pull-right" data-toggle="modal" data-target="#searchHelpModal" style="padding-right: 0px;">
+              <i class="fa fa-info-circle"></i> Search Tips
+            </label>
+          </div>
+        </div>
+      </div>
+      
+      <br>
+
+      <div class="advanced-search-filters">     
+      
+        
+        <div class="row">
+          <div class="col-sm-6"> 
+            <div class="form-group" style="text-align: left;" >
+              <label for="toggle-simple-search" style="padding-bottom: 20px;">Go back to</label>
+              <button type="button" id="toggle-simple-search"  class="btn clickable-label">Quick Search</button>
+            </div>
+          </div> 
+
+          <div class="col-sm-6">
+            <div class="form-group" style="text-align: right;" >
+              <button type="submit" class="btn advance-search-button btn-primary"  id="search-button" style="">
+                <i class="fa fa-search"></i> Search
+              </button>
+            </div> 
+          </div>
+
+        </div> 
+      
+      </div>  
+    </div>   
+
+
+  
+  <div class="form-group simple-search-panel" id="advance-search-option">
+    <label for="toggle-advanced-search" style="padding-bottom: 20px;">Discover more with</label>
+    <button type="button" id="toggle-advanced-search"  class="btn clickable-label">Advanced Search</button>
+  </div>
+
+  <!-- Search Help Modal -->
+  <div class="modal fade" id="searchHelpModal" tabindex="-1" role="dialog" aria-labelledby="searchHelpModalLabel">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+          <h4 class="modal-title" id="searchHelpModalLabel">Advanced Search Tips</h4>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-warning">
+            <strong><i class="fa fa-exclamation-triangle"></i> Special Characters</strong>
+            <p>Please avoid using special characters such as <code>, . ; : - * ! " £ $ % ^ & ( | \ @ { [ ) } ] / ? + = ¬ `</code>.</p>
+            <ul>
+              <li>Instead of <code>Davitt, Cahir</code>, search for <strong>Davitt Cahir</strong>.</li>
+              <li>Instead of <code>Davitt, Cahir, Donor</code>, search for <strong>Davitt Cahir Donor</strong>.</li>
+            </ul>
+          </div>
+
+          <hr>
+
+          <h4><i class="fa fa-info-circle"></i> Search Operators</h4>
+          
+          <div class="panel panel-default">
+            <div class="panel-heading"><strong>Contains</strong></div>
+            <div class="panel-body">
+              <p>The <strong>Contains</strong> operator searches for <em>all</em> the words you enter, in any order, within the specified field.</p>
+              <p><em>Example:</em> Searching for <strong>Michael Davitt</strong> will find records containing both "Michael" AND "Davitt" anywhere in the field.</p>
+            </div>
+          </div>
+
+          <div class="panel panel-default">
+            <div class="panel-heading"><strong>Starts With</strong></div>
+            <div class="panel-body">
+              <p>The <strong>Starts With</strong> operator matches records where the field begins with your search term.</p>
+              <p><strong>Important Notes:</strong></p>
+              <ul>
+                <li>"Starts With" searches are <strong>Case Sensitive</strong>.</li>
+                <li>The following fields are not optimized for prefix searching; as a result, their behavior may resemble that of the “Contains” operator:<ul>
+                    <li>Abstract</li>
+                    <li>Copyright Note</li>
+                    <li>DOI</li>
+                    <li>Shelf Mark/Reference Number</li>
+                  </ul>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="panel panel-default">
+            <div class="panel-heading"><strong>Exact</strong></div>
+            <div class="panel-body">
+              <p>The <strong>Exact</strong> operator searches for the precise phrase you enter, in that exact order.</p>
+              <p><em>Example:</em> Searching for <strong>"Michael Davitt"</strong> will match records containing that exact phrase, but will <em>not</em> match "Davitt, Michael".</p>
+            </div>
+          </div>
+
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
 <% end %>
+
+<!-- jQuery UI for Autocomplete -->
+<link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+<script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+
+<script>
+document.addEventListener("turbolinks:load", function () {
+
+      $('#search-field-header').removeAttr('value');
+      
+      // Add Enter key support for advanced search inputs
+      document.addEventListener('keypress', function(e) {
+        // Check if Enter key was pressed
+        if (e.key === 'Enter' || e.keyCode === 13) {
+          // Check if the target is a search input field in advanced search
+          if (e.target.classList.contains('q') || 
+              e.target.id === 'search-field-header') {
+            e.preventDefault();
+            // Submit the search form
+            document.getElementById('search-form-header').submit();
+          }
+        }
+      });
+      
+      //Placeholder Animation
+      const searchField = document.getElementById("search-field-header");
+      
+      //const placeholderText = "Search Entire Collection";
+      let index = 0;
+      //$("#search-field-header").attr("placeholder", "");
+
+      //const intervalId = setInterval(() => {
+      //  if (index < placeholderText.length) {
+      //    searchField.placeholder += placeholderText[index];
+      //    index++;
+      //  } else {
+      //    clearInterval(intervalId);
+      //  }
+      //}, 120); 
+
+      //Search Info Tooltip
+      $('[data-toggle="tooltip"]').tooltip();
+
+      // Move Modal to Body to prevent z-index issues
+      $('#searchHelpModal').appendTo("body");
+
+      //Toggle the Advance Search Option
+      const advancedPanel = document.querySelector(".advanced-search-panel");
+      const toggleAdvancedSearch = document.getElementById("toggle-advanced-search");
+
+      const simplePanel = document.querySelector(".simple-search-panel");
+      const toggleSimpleSearch = document.getElementById("toggle-simple-search");
+      
+      // Function to clear advanced search state from localStorage
+      function clearAdvancedSearchState() {
+          localStorage.removeItem("savedSearchFields");
+          localStorage.removeItem("advancedPanelState");
+          localStorage.removeItem("savedTimeRange");
+      }
+
+      // Clear advanced search state when Simple Search button is clicked
+      const simpleSearchButton = document.getElementById("search-submit-header");
+      if (simpleSearchButton) {
+          simpleSearchButton.addEventListener("click", clearAdvancedSearchState);
+      }
+
+      // Clear advanced search state when Enter is pressed in Simple Search input
+      const simpleSearchInput = document.getElementById("search-field-header");
+      if (simpleSearchInput) {
+          simpleSearchInput.addEventListener("keypress", function(e) {
+              if (e.key === 'Enter' || e.keyCode === 13) {
+                  clearAdvancedSearchState();
+              }
+          });
+      }
+      
+
+      toggleAdvancedSearch.addEventListener("click", function() {
+          $('#advance-search-option').hide();
+          simplePanel.style.display = "none";
+          advancedPanel.style.display = 'block';
+          
+          // Ensure timeline is correctly sized and drawn when panel is opened
+          setTimeout(() => {
+              syncCanvasSize();
+              drawSlider();
+              updateHTMLLabels();
+          }, 10);
+      });
+
+      toggleSimpleSearch.addEventListener("click", function() {
+          advancedPanel.style.display = 'none';
+          simplePanel.style.display = "block";
+          $('#advance-search-option').show();
+      });
+    
+
+      const addButton = document.getElementById("add-line");
+      const dynamicContainer = document.querySelector(".dynamic-queries-container");
+      let addCount = 1;
+      const maxAddCount = 10;
+
+      const addNewLineHTML = `
+        <div class="row search-row">
+          <div class="col-sm-2">
+            <select name="search_logic[]" class="form-control logic-dropdown">
+              <option value="AND">AND</option>
+              <option value="OR">OR</option>
+              <option value="NOT">NOT</option>
+            </select>
+          </div>
+          <div class="col-sm-3">
+            <select name="search_field[]" class="form-control field-dropdown">
+              <option value="any">Any Field</option>
+              <option value="abstract_tesim">Abstract</option>
+              <option value="contributor_tesim">Creator / Contributor</option>
+              <option value="copyright_note_tesim">Copyright note</option>
+              <option value="digital_object_identifier_tesim">DOI</option>
+              <option value="keyword_tesim">Keyword / Subject</option>
+              <option value="publisher_tesim">Publisher</option>
+              <option value="identifier_tesim">Shelf Mark/Reference Number</option>
+              <option value="title_tesim">Title</option>
+            </select>
+          </div>
+          <div class="col-sm-3">
+            <select name="search_operator[]" class="form-control operator-dropdown">
+              <option value="contains">Contains</option>
+              <option value="starts_with">Starts With</option>
+              <option value="equal">Exact</option>
+            </select>
+          </div>
+          <div class="col-sm-3">
+              <%= text_field_tag "search_query[]", nil, class: "q form-control", placeholder: "Search term" %>            
+
+          </div>
+          
+        <div class="col-sm-1">
+            <button type="button" class="btn btn-clear-line" style="color: #fff; background-color: #ff76762b; border: 1px solid #ff9393;" data-toggle="tooltip" title="Remove this row">
+              <i class="fa fa-trash-o" style="font-size:20px;"></i>
+            </button>
+          </div>
+        </div>
+
+
+    `;
+
+    // Safe setup with a flag
+      if (!addButton.dataset.listenerAttached) {
+        addButton.addEventListener("click", function() {
+          if (addCount < maxAddCount) {
+            const newLineHTML = `<div class="query-line" id="dynamic-search-rows">` + addNewLineHTML + `</div>`;
+            dynamicContainer.insertAdjacentHTML("beforeend", newLineHTML);
+            addCount++;
+            // Initialize tooltips for new elements
+            $('[data-toggle="tooltip"]').tooltip();
+          } else {
+            alert("You can only add up to 10 search lines.");
+          }
+        });
+
+        // Mark as attached so this block doesn't run again
+        addButton.dataset.listenerAttached = "true";
+      }
+
+
+
+      dynamicContainer.addEventListener("click", function(e) {
+          const removeButton = e.target.closest(".btn-clear-line");
+          if (removeButton) {
+              const queryLine = removeButton.closest(".query-line");
+              if (queryLine) {
+                  queryLine.remove();
+                  if (addCount > 0) addCount--;
+              }
+          }
+      });
+
+
+      const canvas = document.getElementById("timeline-canvas");
+      const ctx = canvas.getContext("2d");
+
+      const minYear = -2500;
+      const maxYear = new Date().getFullYear();
+      console.log('Date range slider - Current year (maxYear):', maxYear);
+      const initialStartYear = 1150;
+      const initialEndYear = 1950;
+
+      // Non-linear scale parameters
+      // This gives more precision to recent years while maintaining full historical range
+      const zoomPoint = 1800; // Year where we start expanding precision
+      const compressionFactor = 0.15; // How much to compress older years (0-1, lower = more compression)
+      const expansionFactor = 0.65; // How much of the slider to use for recent years (1800+)
+
+      // Get the actual internal width of the canvas
+      function getCanvasWidth() {
+          return canvas.width || 885;
+      }
+
+      // Convert year to slider position (non-linear)
+      function yearToPosition(year) {
+          const canvasWidth = getCanvasWidth();
+          const totalRange = maxYear - minYear;
+          const normalizedYear = (year - minYear) / totalRange; // 0 to 1
+          
+          if (year <= zoomPoint) {
+              // Older years: use compressed scale with power function
+              const zoomPointNormalized = (zoomPoint - minYear) / totalRange;
+              const yearRatio = normalizedYear / zoomPointNormalized; // 0 to 1 for older years
+              // Use power function to compress older years
+              const compressedRatio = Math.pow(yearRatio, 1.5); // Adjust exponent for more/less compression
+              return compressedRatio * zoomPointNormalized * (1 - expansionFactor) * canvasWidth;
+          } else {
+              // Recent years: use expanded linear scale
+              const zoomPointNormalized = (zoomPoint - minYear) / totalRange;
+              const recentRange = 1 - zoomPointNormalized;
+              const yearRatio = (normalizedYear - zoomPointNormalized) / recentRange; // 0 to 1 for recent years
+              const startPosition = zoomPointNormalized * (1 - expansionFactor) * canvasWidth;
+              const expandedRange = expansionFactor * canvasWidth;
+              return startPosition + yearRatio * expandedRange;
+          }
+      }
+
+      // Convert slider position to year (inverse of yearToPosition)
+      function positionToYear(position) {
+          const canvasWidth = getCanvasWidth();
+          const totalRange = maxYear - minYear;
+          const zoomPointNormalized = (zoomPoint - minYear) / totalRange;
+          const oldYearsEndPosition = zoomPointNormalized * (1 - expansionFactor) * canvasWidth;
+          
+          if (position <= oldYearsEndPosition) {
+              // Older years: reverse the compression
+              const compressedRatio = position / oldYearsEndPosition;
+              const yearRatio = Math.pow(compressedRatio, 1 / 1.5); // Inverse of power function
+              const normalizedYear = yearRatio * zoomPointNormalized;
+              return Math.round(normalizedYear * totalRange + minYear);
+          } else {
+              // Recent years: reverse the expansion
+              const startPosition = oldYearsEndPosition;
+              const expandedRange = expansionFactor * canvasWidth;
+              const yearRatio = (position - startPosition) / expandedRange;
+              const recentRange = 1 - zoomPointNormalized;
+              const normalizedYear = zoomPointNormalized + yearRatio * recentRange;
+              const calculatedYear = Math.round(normalizedYear * totalRange + minYear);
+              // Ensure we never exceed maxYear
+              return Math.min(calculatedYear, maxYear);
+          }
+      }
+
+      // Source of truth for years
+      let currentStartYear = initialStartYear;
+      let currentEndYear = initialEndYear;
+
+      // Initialize pointers
+      const startPointer = {
+          x: 0,
+          y: 25,
+          label: ""
+      };
+    
+      const endPointer = {
+          x: 0,
+          y: 25,
+          label: ""
+      };
+
+      function updatePointersFromYears() {
+          startPointer.x = yearToPosition(currentStartYear);
+          endPointer.x = yearToPosition(currentEndYear);
+      }
+
+      function updateYearLabels() {
+          // Function to format the year as BCE or CE
+          function formatYear(year) {
+              if (year <= 0) {
+                  return Math.abs(year) + " BCE";  // Display BCE for negative years
+              } else {
+                  return year + " CE";  // Display CE for positive years
+              }
+          }
+
+          // Update the labels to show the formatted years
+          startPointer.label = formatYear(currentStartYear);
+          endPointer.label = formatYear(currentEndYear);
+      }
+
+
+      function drawSlider() {
+          const isEnabled = document.getElementById('date-toggle').checked;
+          
+          // Ensure internal dimensions match rendered dimensions for 1:1 mapping
+          const rect = canvas.getBoundingClientRect();
+          if (rect.width > 0 && canvas.width !== Math.round(rect.width)) {
+              canvas.width = Math.round(rect.width);
+              canvas.height = 50;
+              updatePointersFromYears();
+          }
+
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+          if (!isEnabled) {
+              ctx.globalAlpha = 0.4;
+          } else {
+              ctx.globalAlpha = 1.0;
+          }
+
+          // Draw timeline background for the entire slider
+          const trackHeight = 12;
+          const trackY = startPointer.y - 5;
+          const radius = 6;
+
+          ctx.fillStyle = "#f0f0f0"; // Light gray background outside the range
+          
+          // Draw rounded track background
+          ctx.beginPath();
+          ctx.moveTo(radius, trackY);
+          ctx.lineTo(canvas.width - radius, trackY);
+          ctx.arc(canvas.width - radius, trackY + radius, radius, Math.PI * 1.5, Math.PI * 0.5, false);
+          ctx.lineTo(radius, trackY + trackHeight);
+          ctx.arc(radius, trackY + radius, radius, Math.PI * 0.5, Math.PI * 1.5, false);
+          ctx.closePath();
+          ctx.fill();
+          
+
+          // Draw timeline background for the selected range with gradient
+          const gradient = ctx.createLinearGradient(startPointer.x, 0, endPointer.x, 0);
+          gradient.addColorStop(0, "#667eea");    // Purple
+          gradient.addColorStop(0.5, "#4facfe");  // Blue
+          gradient.addColorStop(1, "#00f2fe");    // Cyan
+          ctx.fillStyle = gradient;
+          ctx.beginPath();
+          ctx.rect(startPointer.x, trackY, endPointer.x - startPointer.x, trackHeight);
+          ctx.fill();
+
+          // Draw start pointer with gradient
+          const startGradient = ctx.createRadialGradient(startPointer.x, startPointer.y, 0, startPointer.x, startPointer.y, 10);
+          startGradient.addColorStop(0, "#667eea");
+          startGradient.addColorStop(1, "#764ba2");
+          ctx.fillStyle = startGradient;
+          ctx.beginPath();
+          ctx.arc(startPointer.x, startPointer.y, 10, 0, Math.PI * 2);
+          ctx.fill();
+          
+          // Add white border to pointer
+          ctx.strokeStyle = "#fff";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          // Draw end pointer with gradient
+          const endGradient = ctx.createRadialGradient(endPointer.x, endPointer.y, 0, endPointer.x, endPointer.y, 10);
+          endGradient.addColorStop(0, "#00f2fe");  // Cyan
+          endGradient.addColorStop(1, "#4facfe");  // Blue
+          ctx.fillStyle = endGradient;
+          ctx.beginPath();
+          ctx.arc(endPointer.x, endPointer.y, 10, 0, Math.PI * 2);
+          ctx.fill();
+          
+          // Add white border to pointer
+          ctx.strokeStyle = "#fff";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          // Draw labels - REMOVED from canvas, now using HTML
+      }
+
+      function updateHTMLLabels() {
+          const startLabel = document.getElementById('start-year-label');
+          const endLabel = document.getElementById('end-year-label');
+          if (!startLabel || !endLabel) return;
+
+          const renderedWidth = canvas.getBoundingClientRect().width;
+          if (renderedWidth <= 0) return;
+          
+          let startX = startPointer.x;
+          let endX = endPointer.x;
+
+          startLabel.innerHTML = startPointer.label;
+          endLabel.innerHTML = endPointer.label;
+
+          // Boundary checks to prevent labels from going off-screen
+          const startWidth = startLabel.offsetWidth;
+          const endWidth = endLabel.offsetWidth;
+          const halfStart = startWidth / 2;
+          const halfEnd = endWidth / 2;
+
+          if (startX - halfStart < 0) startX = halfStart;
+          if (startX + halfStart > renderedWidth) startX = renderedWidth - halfStart;
+
+          if (endX - halfEnd < 0) endX = halfEnd;
+          if (endX + halfEnd > renderedWidth) endX = renderedWidth - halfEnd;
+
+          startLabel.style.left = startX + 'px';
+          endLabel.style.left = endX + 'px';
+
+          // Handle overlap
+          const startRect = startLabel.getBoundingClientRect();
+          const endRect = endLabel.getBoundingClientRect();
+          const minSpacing = 10;
+
+          if (startX + startRect.width/2 + minSpacing > endX - endRect.width/2) {
+              const overlap = (startX + startRect.width/2 + minSpacing) - (endX - endRect.width/2);
+              startLabel.style.left = (startX - overlap/2) + 'px';
+              endLabel.style.left = (endX + overlap/2) + 'px';
+          }
+      }
+
+      function makeLabelEditable(labelId, pointer) {
+          const label = document.getElementById(labelId);
+          if (!label || label.querySelector('input')) return;
+
+          const currentYear = (pointer === startPointer) ? currentStartYear : currentEndYear;
+          const yearNum = Math.abs(currentYear);
+          const suffix = currentYear <= 0 ? " BCE" : " CE";
+
+          const input = document.createElement('input');
+          input.type = 'text';
+          input.className = 'year-edit-input';
+          input.value = yearNum;
+
+          label.innerHTML = '';
+          label.appendChild(input);
+          input.focus();
+          input.select();
+
+          function saveEdit() {
+              let newYearNum = parseInt(input.value);
+              if (isNaN(newYearNum)) {
+                  newYearNum = yearNum;
+              }
+
+              // Apply the same BCE/CE logic
+              let newYear = (pointer === startPointer ? currentStartYear : currentEndYear) <= 0 ? -newYearNum : newYearNum;
+              
+              // Validate range
+              if (newYear < minYear) newYear = minYear;
+              if (newYear > maxYear) newYear = maxYear;
+
+              // Ensure pointers don't cross
+              if (pointer === startPointer) {
+                  if (newYear >= currentEndYear) newYear = currentEndYear - 1;
+                  currentStartYear = newYear;
+              } else {
+                  if (newYear <= currentStartYear) newYear = currentStartYear + 1;
+                  currentEndYear = newYear;
+              }
+
+              updatePointersFromYears();
+              updateYearLabels();
+              drawSlider();
+              updateHTMLLabels();
+          }
+
+          input.addEventListener('blur', saveEdit);
+          input.addEventListener('keypress', function(e) {
+              if (e.key === 'Enter') {
+                  input.blur();
+              }
+              // Only allow numbers
+              if (!/[0-9]/.test(e.key)) {
+                  e.preventDefault();
+              }
+          });
+      }
+
+      document.getElementById('start-year-label').addEventListener('click', () => makeLabelEditable('start-year-label', startPointer));
+      document.getElementById('end-year-label').addEventListener('click', () => makeLabelEditable('end-year-label', endPointer));
+
+
+      function dragPointer(e, pointer) {
+          const rect = canvas.getBoundingClientRect();
+          const minLeft = 0;
+          const maxLeft = getCanvasWidth();
+
+          function onMouseMove(event) {
+              const rect = canvas.getBoundingClientRect();
+              let newX = event.clientX - rect.left;
+              newX = Math.min(Math.max(newX, minLeft), maxLeft);
+
+              if (pointer === startPointer) {
+                  const endX = endPointer.x;
+                  if (newX >= endX) {
+                      newX = endX - 1;
+                  }
+                  currentStartYear = positionToYear(newX);
+              } else {
+                  const startX = startPointer.x;
+                  if (newX <= startX) {
+                      newX = startX + 1;
+                  }
+                  currentEndYear = positionToYear(newX);
+              }
+
+              updatePointersFromYears();
+              updateYearLabels();
+              drawSlider();
+              updateHTMLLabels();
+          }
+
+          function onMouseUp() {
+              document.removeEventListener("mousemove", onMouseMove);
+              document.removeEventListener("mouseup", onMouseUp);
+          }
+
+          document.addEventListener("mousemove", onMouseMove);
+          document.addEventListener("mouseup", onMouseUp);
+      }
+
+      canvas.addEventListener("mousedown", function(e) {
+          if (!document.getElementById('date-toggle').checked) return;
+          const rect = canvas.getBoundingClientRect();
+          const mouseX = e.clientX - rect.left;
+          
+          const distStart = Math.abs(mouseX - startPointer.x);
+          const distEnd = Math.abs(mouseX - endPointer.x);
+
+          if (distStart < distEnd) {
+              dragPointer(e, startPointer);
+          } else {
+              dragPointer(e, endPointer);
+          }
+      });
+
+      // Sync canvas internal width with rendered width for proper scaling
+      function syncCanvasSize() {
+          const rect = canvas.getBoundingClientRect();
+          const renderedWidth = rect.width;
+          if (renderedWidth && renderedWidth > 0 && (canvas.width !== Math.round(renderedWidth) || canvas.height !== 50)) {
+              // Update canvas internal dimensions
+              canvas.width = Math.round(renderedWidth);
+              canvas.height = 50;
+              
+              // Recalculate pointer positions from years
+              updatePointersFromYears();
+          }
+      }
+
+      // Initial setup
+      syncCanvasSize();
+      updatePointersFromYears();
+      updateYearLabels();
+      drawSlider();
+      updateHTMLLabels();
+
+      // Handle window resize
+      let resizeTimeout;
+      window.addEventListener('resize', function() {
+          clearTimeout(resizeTimeout);
+          resizeTimeout = setTimeout(function() {
+              syncCanvasSize();
+              drawSlider();
+              updateHTMLLabels();
+          }, 100);
+      });
+
+      // Redraw slider when toggle changes
+      const dateToggle = document.getElementById('date-toggle');
+      if (dateToggle) {
+          dateToggle.addEventListener('change', function() {
+              drawSlider();
+              updateHTMLLabels();
+          });
+      }
+
+      const searchButton = document.getElementById('search-button');
+      const rowsContainer = document.getElementById('dynamic-search-rows');
+
+      function restoreSearchFields() {
+        const savedSearchFields = localStorage.getItem("savedSearchFields");
+        const savedPanelState = localStorage.getItem("advancedPanelState");
+        const savedTimeRange = localStorage.getItem("savedTimeRange");
+        const savedDateToggleState = localStorage.getItem("dateToggleState");
+    
+        // Restore date toggle state
+        if (savedDateToggleState) {
+            document.getElementById('date-toggle').checked = (savedDateToggleState === "enabled");
+        }
+
+        // Restore search fields values
+        if (savedSearchFields) {
+            const searchFieldsData = JSON.parse(savedSearchFields);
+            const dynamicContainer = document.getElementById("dynamic-search-rows");
+    
+            // Ensure we have enough rows
+            while (document.querySelectorAll(".search-row").length < searchFieldsData.length) {
+                addSearchRow(); // Add new row dynamically
+            }
+    
+            document.querySelectorAll(".search-row").forEach((row, index) => {
+                if (searchFieldsData[index]) {
+                    const fieldData = searchFieldsData[index];
+    
+                    // Check for logic dropdown (skip for the first row)
+                    const logicDropdown = row.querySelector(".logic-dropdown");
+                    if (logicDropdown) {
+                        logicDropdown.value = fieldData.logic;
+                    }
+    
+                    const fieldDropdown = row.querySelector(".field-dropdown");
+                    if (fieldDropdown) {
+                        fieldDropdown.value = fieldData.field;
+                    }
+    
+                    const operatorDropdown = row.querySelector(".operator-dropdown");
+                    if (operatorDropdown) {
+                        operatorDropdown.value = fieldData.operator;
+                    }
+    
+                    const queryInput = row.querySelector(".q");
+                    if (queryInput) {
+                        queryInput.value = fieldData.query;
+                    }
+                }
+            });
+        }
+    
+        // Restore Advanced Search Panel visibility
+        if (savedPanelState === "open") {
+            advancedPanel.style.display = "block";
+            simplePanel.style.display = "none";
+            document.getElementById("advance-search-option").style.display = "none";
+        }
+    
+        // Restore time slider values
+        if (savedTimeRange) {
+            const [startYear, endYear] = JSON.parse(savedTimeRange);
+    
+            currentStartYear = startYear;
+            currentEndYear = endYear;
+
+            // Update pointers and labels
+            updatePointersFromYears();
+            updateYearLabels();
+        }
+        drawSlider();
+        updateHTMLLabels();
+    }
+    
+    // Function to extract the correct year value from the label
+    function extractYearFromLabel(label) {
+        let year = parseInt(label);  // Extract the numeric part of the label
+
+        if (label.includes("BCE")) {
+            return -Math.abs(year);  // If BCE, return a negative year
+        } else if (label.includes("CE")) {
+            return Math.abs(year);  // If CE, return the positive year
+        }
+        
+        return year;  // In case of no label, return the year as it is
+    }
+
+    function addSearchRow() {
+      const dynamicContainer = document.getElementById("dynamic-search-rows");
+
+      
+
+      if (addCount < maxAddCount) {
+        const newLineHTML= ` <div class="query-line" id="dynamic-search-rows" style="margin-top:15px"">` + addNewLineHTML + `</div>`;
+            
+
+          // Append to container
+          dynamicContainer.insertAdjacentHTML("beforeend", newLineHTML);
+          addCount++;
+
+          // Hide logic dropdown for the first row
+          const allRows = dynamicContainer.querySelectorAll(".search-row");
+          if (allRows.length === 1) {
+              allRows[0].querySelector(".logic-dropdown").style.display = "none";
+          }
+
+          // Add event listener for the remove button
+          const removeButtons = document.querySelectorAll(".remove-btn");
+          removeButtons.forEach(button => {
+              button.onclick = function () {
+                  this.closest(".search-row").remove();
+                  addCount--;
+              };
+          });
+      } else {
+          alert("You can only add up to 10 search lines.");
+      }
+   }
+
+
+    function saveSearchFields() {
+      const searchFieldsData = [];
+  
+      document.querySelectorAll(".search-row").forEach((row) => {
+          const logic = row.querySelector(".logic-dropdown") ? row.querySelector(".logic-dropdown").value : '';
+          const field = row.querySelector(".field-dropdown").value;
+          const operator = row.querySelector(".operator-dropdown").value;
+          const query = row.querySelector(".q").value;
+  
+          searchFieldsData.push({ logic, field, operator, query });
+      });
+  
+      // Save search fields data
+      localStorage.setItem("savedSearchFields", JSON.stringify(searchFieldsData));
+  
+      // Save time range values
+      const savedTimeRange = JSON.stringify([currentStartYear, currentEndYear]);
+      localStorage.setItem("savedTimeRange", savedTimeRange);
+  
+      // Save date toggle state
+      localStorage.setItem("dateToggleState", document.getElementById('date-toggle').checked ? "enabled" : "disabled");
+
+      // Save advanced panel state
+      localStorage.setItem("advancedPanelState", advancedPanel.style.display === "block" ? "open" : "closed");
+    }
+  
+  
+
+    
+
+    function getSearchParams() {
+      let combinedQuery = '';
+      
+      document.querySelectorAll(".search-row").forEach((row, index) => {
+          let logic = row.querySelector(".logic-dropdown") ? row.querySelector(".logic-dropdown").value : ''; 
+          let field = row.querySelector(".field-dropdown").value;
+          let operator = row.querySelector(".operator-dropdown").value;
+          let query = row.querySelector(".q").value.trim();
+  
+          // Skip empty queries
+        if (!query) return;
+
+        // Apply correct formatting based on the operator
+        // Handle multi-word queries and operators properly
+        if (operator === 'contains') {
+            // For contains: we use a combined approach (term OR *term*)
+            // This allows stemming to work (via 'term') AND substring matching (via '*term*')
+            // query is processed per-word below
+        } else if (operator === 'starts_with') {
+            // For starts_with: do NOT add wildcard here, it's added later
+            // But we DO need to escape spaces for Solr string fields
+            query = query.replace(/ /g, '\\ ');
+        } else if (operator === 'equal') {
+            // For exact: always wrap in quotes
+            query = `"${query}"`;
+        }
+
+        // Helper to expand plural words (Safe S-Removal)
+        const expandPlurals = (word, fieldName) => {
+            // Logic: length > 3, ends in 's', but not 'ss'
+            if (word.length > 3 && word.toLowerCase().endsWith('s') && !word.toLowerCase().endsWith('ss')) {
+                const singular = word.slice(0, -1);
+                // Return expanded query: (field:word OR field:*word*) OR (field:singular OR field:*singular*)
+                return `((${fieldName}:${word} OR ${fieldName}:*${word}*) OR (${fieldName}:${singular} OR ${fieldName}:*${singular}*))`;
+            }
+            // Default: just standard term + wildcard
+            return `(${fieldName}:${word} OR ${fieldName}:*${word}*)`;
+        };
+
+        let queryPart;
+        
+        // Helper to get correct field name for starts_with
+        const getFieldForOperator = (fieldName, op) => {
+            if (op !== 'starts_with') return fieldName;
+            
+            // Map of fields that have string (_sim) versions suitable for prefix search
+            const simFieldMap = {
+                'title_tesim': 'title_sim',
+                'creator_tesim': 'creator_sim',
+                'contributor_tesim': 'contributor_sim',
+                'keyword_tesim': 'keyword_sim',
+                'publisher_tesim': 'publisher_sim',
+                'subject_tesim': 'subject_sim',
+                'language_tesim': 'language_sim',
+                'genre_tesim': 'genre_sim',
+                'resource_type_tesim': 'resource_type_sim'
+            };
+            
+            return simFieldMap[fieldName] || fieldName;
+        };
+
+        // Handle "any" field - search across all fields
+        if (field === 'any') {
+            const allFields = [
+                'abstract_tesim',
+                'contributor_tesim',
+                'creator_tesim',
+                'keyword_tesim',
+                'subject_tesim',
+                'publisher_tesim',
+                'identifier_tesim',
+                'title_tesim',
+                'copyright_note_tesim',
+                'digital_object_identifier_tesim'
+            ];
+            
+            if (operator === 'contains') {
+                // Split into words and search each word across all fields
+                const words = query.trim().split(/\s+/);
+                const wordQueries = words.map(word => {
+                    const fieldQueries = allFields.map(f => expandPlurals(word, f)).join(' OR ');
+                    return `(${fieldQueries})`;
+                });
+                queryPart = wordQueries.join(' AND ');
+            } else if (operator === 'starts_with') {
+                // For starts_with: use prefix query on _sim fields where available
+                const fieldQueries = allFields.map(f => {
+                    const searchField = getFieldForOperator(f, operator);
+                    // Only escape spaces if we switched to a _sim field
+                    const val = (searchField !== f) ? query.replace(/ /g, '\\ ') : query;
+                    return `${searchField}:${val}*`;
+                }).join(' OR ');
+                queryPart = `(${fieldQueries})`;
+            } else if (operator === 'equal') {
+                // For exact: use phrase query
+                const fieldQueries = allFields.map(f => `${f}:"${query}"`).join(' OR ');
+                queryPart = `(${fieldQueries})`;
+            }
+        }
+        // Special handling for combined facets
+        else if (field === "contributor_tesim") {
+            if (operator === 'contains') {
+                const words = query.replace(/\*/g, '').trim().split(/\s+/);
+                const wordQueries = words.map(word => {
+                    const contQuery = expandPlurals(word, 'contributor_tesim');
+                    const creatQuery = expandPlurals(word, 'creator_tesim');
+                    return `(${contQuery} OR ${creatQuery})`;
+                });
+                queryPart = wordQueries.join(' AND ');
+            } else if (operator === 'starts_with') {
+                queryPart = `(contributor_sim:${query}* OR creator_sim:${query}*)`;
+            } else {
+                queryPart = `(contributor_tesim:${query} OR creator_tesim:${query})`;
+            }
+        } else if (field === "keyword_tesim") {
+            if (operator === 'contains') {
+                const words = query.replace(/\*/g, '').trim().split(/\s+/);
+                const wordQueries = words.map(word => {
+                    const keyQuery = expandPlurals(word, 'keyword_tesim');
+                    const subQuery = expandPlurals(word, 'subject_tesim');
+                    return `(${keyQuery} OR ${subQuery})`;
+                });
+                queryPart = wordQueries.join(' AND ');
+            } else if (operator === 'starts_with') {
+                queryPart = `(keyword_sim:${query}* OR subject_sim:${query}*)`;
+            } else {
+                queryPart = `(keyword_tesim:${query} OR subject_tesim:${query})`;
+            }
+        } else {
+            // Single specific field
+            if (operator === 'contains') {
+                const words = query.replace(/\*/g, '').trim().split(/\s+/);
+                const wordQueries = words.map(word => expandPlurals(word, field));
+                queryPart = `(${wordQueries.join(' AND ')})`;
+            } else {
+                const searchField = getFieldForOperator(field, operator);
+                const val = operator === 'starts_with' ? `${query}*` : query;
+                queryPart = `(${searchField}:${val})`;
+            }
+        }
+
+        // Append logic only from the second row onward
+        if (index > 0 && logic) {
+            combinedQuery += ` ${logic} `;
+        }
+
+        combinedQuery += queryPart;
+      });
+  
+      // Fetch time range values from the timeline slider if enabled
+      const dateEnabled = document.getElementById('date-toggle').checked;
+      if (dateEnabled) {
+          const startYear = currentStartYear;
+          const endYear = currentEndYear;
+      
+          if (combinedQuery) {
+              combinedQuery += " AND ";
+          }
+      
+          // Append time range filter to query (include records without dates)
+          combinedQuery += `(date_created_tesim:[${startYear} TO ${endYear}] OR (*:* NOT date_created_tesim:*))`;
+      }
+  
+      return new URLSearchParams({ q: combinedQuery }).toString();
+  }
+  
+  
+
+  
+
+    // Advance search button click
+    searchButton.addEventListener('click', function(event) {
+        event.preventDefault();
+        saveSearchFields();
+        let searchParams = getSearchParams();
+        let currentPath = window.location.pathname;
+        
+        if (currentPath !== "/catalog") {
+            restoreSearchFields();
+            // Redirect to /catalog but keep input values
+            let newUrl = "/catalog?" + searchParams;
+            history.pushState(null, "", newUrl);
+            window.location.href = newUrl;
+        } else {
+            restoreSearchFields();
+            // If already on /catalog, update the URL and reload without full refresh
+            let newUrl = "/catalog?" + searchParams;
+            history.pushState(null, "", newUrl);
+            window.location.assign(newUrl);            
+        }
+    });
+
+
+    // Keep search fields populated after page load
+    function restoreSearchFields_old() {
+        let params = new URLSearchParams(window.location.search);
+        let query = params.get('q');
+
+        if (query) {
+            let conditions = query.split(/ (AND|OR) /); // Splitting query by logic operators
+
+            document.querySelectorAll(".search-row").forEach((row, index) => {
+                if (conditions[index]) {
+                    let match = conditions[index].match(/\((.*?):(.*?)\)/);
+                    if (match) {
+                        let field = match[1];
+                        let queryValue = match[2];
+
+                        row.querySelector(".field-dropdown").value = field;
+                        row.querySelector(".q").value = queryValue.replace(/\*/g, ''); // Remove wildcards
+                    }
+                }
+            });
+        }
+    }
+
+    restoreSearchFields(); // Restore fields when page loads
+
+    // Preserve search results when using back/forward navigation
+    window.addEventListener("popstate", function() {
+        restoreSearchFields();
+        location.reload(); // Reload but keep input values
+    });
+
+    // Clear All button event
+    const clearAllButton = document.getElementById("clear-all");
+
+    clearAllButton.addEventListener("click", function() {
+        // Clear all saved data from localStorage
+        localStorage.removeItem("savedSearchFields");
+        localStorage.removeItem("savedTimeRange");
+        localStorage.removeItem("advancedPanelState");
+        localStorage.removeItem("dateToggleState");
+
+        // Reset date toggle to enabled
+        document.getElementById('date-toggle').checked = true;
+
+        // Optionally clear the search fields (if needed)
+        document.querySelectorAll(".search-row").forEach((row) => {
+            //row.querySelector(".logic-dropdown").value = 'AND'; // or reset to default value
+            row.querySelector(".field-dropdown").value = 'any'; // or reset to default field
+            row.querySelector(".operator-dropdown").value = 'contains'; // or reset to default operator
+            row.querySelector(".q").value = ''; // reset search input
+        });
+
+        // Clear the time slider to the default state using non-linear scale
+        startPointer.x = yearToPosition(initialStartYear);
+        endPointer.x = yearToPosition(initialEndYear);
+        updateYearLabels();
+        drawSlider();
+        updateHTMLLabels();
+
+        // Reset the panel to the simple view
+        advancedPanel.style.display = 'none';
+        simplePanel.style.display = 'block';
+        document.getElementById("advance-search-option").style.display = 'block';
+
+        // Redirect to catalog root to show all records
+        const url = clearAllButton.getAttribute("data-redirect-url");
+        if (url) {
+          window.location.href = url;
+        }
+    });
+
+   
+
+
+  });
+
+</script>
+
+
+<style>
+  .advanced-search-panel {
+    padding: 10px;
+    margin-top: 10px;
+    border-radius: 4px;
+  }
+  .dynamic-queries-container {
+    margin-bottom: 10px;
+  }
+  .query-line .row {
+    margin-bottom: 15px;
+  }
+  .q-line-static  {
+    margin-bottom: 15px;
+  }
+  .timeline-bar {
+    position: relative;
+    margin-top: 10px;
+  }
+  .full-width-search {
+    display: flex;
+  }
+  .full-width-search .form-control {
+    flex-grow: 1;
+    border-radius: 15px;
+  }
+
+  .full-width-search .btn-primary {
+    padding: 0;
+    border: none;
+    background-color: transparent;
+  }
+
+  .full-width-search .btn-primary:hover {
+    background-color: #f0f0f0;
+  }
+
+  .full-width-search .btn-primary i {
+    font-size: 20px;
+  }
+  .full-width-search .input-group-append {
+    width: 40px;
+    height: 38px;
+  }
+  .fancy-label {
+    font-size: 36px; 
+    font-weight: bold;
+    color: #ffffff;
+    text-align: center;
+    margin-bottom: 20px;
+    animation: fadeInUp 1s ease-in-out;
+  }
+
+  @keyframes fadeInUp {
+    0% {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .search-button {
+    size:large;
+    background-color: transparent;
+    border: none;
+    padding-left: 10px;
+  }
+  .search-button i {
+    font-size: 24px; 
+  }
+
+  .search-button:hover {
+    cursor: pointer;
+  }
+  #search-field-header {
+  border-radius: 15px;
+  }
+  .clickable-label {
+    background-color: transparent;
+    border: none;
+    color: #fff;
+    padding-top: 2px;
+    padding-left: 2px;
+    cursor: pointer;
+    font-weight: bolder;
+    text-decoration: underline;
+  }
+
+  .clickable-label:hover {
+    color: #00c2ff;
+    text-decoration: underline;
+  }
+
+  .clickable-add-option {
+    background-color: transparent;
+    padding-top: 2px;
+    padding-left: 2px;
+    cursor: pointer;
+    font-weight: bolder;
+    color:#81c4f3;
+  }
+
+  .clickable-add-option:hover {
+    color: #00c2ff;
+  }
+
+  .clickable-clear-option {
+    background-color: transparent;
+    padding-top: 2px;
+    padding-left: 2px;
+    cursor: pointer;
+    font-weight: bolder;
+    color:#ff9393;
+  }
+
+  .clickable-clear-option:hover {
+    color: red;
+  }
+  .advance-search-button {
+    color:#fff; 
+    background-color: #00a1ff26; 
+    border: 1px solid #81caff;
+  }
+  .advance-search-button:hover {
+    color:#fff; 
+    background-color: #00a1ff63; 
+    border: 1px solid #81caff ;
+  }
+
+  #timeline-canvas {
+    width: 100%;         
+    height: 50px; /* Fixed height to eliminate distortion */
+    display: block;      
+    max-width: 100%;    
+  }
+
+  .timeline-wrapper {
+    /* Rely on parent padding for alignment */
+  }
+
+  /* Modern Toggle Switch */
+  .switch {
+    position: relative;
+    display: inline-block;
+    width: 34px;
+    height: 18px;
+  }
+
+  .switch input { 
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    -webkit-transition: .4s;
+    transition: .4s;
+  }
+
+  .slider:before {
+    position: absolute;
+    content: "";
+    height: 14px;
+    width: 14px;
+    left: 2px;
+    bottom: 2px;
+    background-color: white;
+    -webkit-transition: .4s;
+    transition: .4s;
+  }
+
+  input:checked + .slider {
+    background-color: #2196F3;
+  }
+
+  input:focus + .slider {
+    box-shadow: 0 0 1px #2196F3;
+  }
+
+  input:checked + .slider:before {
+    -webkit-transform: translateX(16px);
+    -ms-transform: translateX(16px);
+    transform: translateX(16px);
+  }
+
+  /* Rounded sliders */
+  .slider.round {
+    border-radius: 18px;
+  }
+
+  .slider.round:before {
+    border-radius: 50%;
+  }
+
+  .year-label:hover {
+    text-decoration: underline;
+    color: #ffeb3b !important; /* Slight yellow on hover to indicate clickability */
+  }
+
+  .year-edit-input {
+    width: 60px;
+    height: 22px;
+    background: white;
+    border: 1px solid #4facfe;
+    border-radius: 4px;
+    color: #333;
+    font-weight: bold;
+    text-align: center;
+    font-size: 13px;
+    padding: 0;
+    margin: 0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    outline: none;
+  }
+</style>

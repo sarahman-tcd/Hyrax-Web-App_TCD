@@ -1,5 +1,38 @@
 <div id="content" class="col-md-9 col-md-push-3 col-sm-8 col-sm-push-4">
-    <%= render 'search_results' %>
+<input type="hidden" id="current-search-params" value='<%= params.to_unsafe_h.to_json %>'>
+
+  <div id="publisher-location-map" class="hidden-map">
+    <div id="map-loading">
+      <p>Loading map, please wait...</p>
+    </div>
+    <button id="reload-map-btn" style="
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 1000;
+      padding: 6px 10px;
+      background-color: #fff;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      cursor: pointer;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+    ">
+    <i class="fa fa-refresh" aria-hidden="true"></i> 
+    </button>
+    <%= render 'location-based-filter' %>
+  </div>
+  <%= render 'search_results' %>
+  
+  <!-- AJAX Pagination Containers -->
+  <div id="ajax-results" style="display:none;">
+    <div id="ajax-controls-top" class="row" style="margin-bottom: 20px; background-color: #f5f5f5; padding: 10px; border-radius: 4px;">
+      <!-- Will be populated by JS -->
+    </div>
+    
+    <div id="ajax-documents"></div>
+    
+    <div id="ajax-pagination" style="margin-top: 20px;"></div>
+  </div>
 </div>
 
 <div id="sidebar" class="col-md-3 col-md-pull-9 col-sm-4 col-sm-pull-8">
@@ -7,6 +40,21 @@
 </div>
 
 
+<style>
+#publisher-location-map {
+  display: none;
+  opacity: 0;
+  transform: scale(0.95);
+  transition: opacity 0.5s ease-out, transform 0.3s ease-out, background-color 0.5s ease-out;
+}
+
+#publisher-location-map.show {
+  opacity: 1;
+  transform: scale(1);
+  background-color: white;
+}
+
+</style>
 
 <script> 
   $(document).on('click', '.tileOrderContainer', function(event) {
@@ -88,3 +136,367 @@
     fetchData();
   });
 </script>
+
+
+
+<script>  
+  document.getElementById("reload-map-btn").addEventListener("click", function () {
+      location.reload();
+  });
+   <%# Uncomment THIS to add Place of Publication to the sidebar
+  document.getElementById("publisher-location-sidebar-item").addEventListener("click", function(event) {
+    event.preventDefault();
+    let mapView = document.getElementById("publisher-location-map");
+
+    if (mapView) {
+      mapView.classList.toggle("show");
+
+      if (mapView.classList.contains("show")) {
+        mapView.style.display = "block";
+        if (!window.publisherMapInitialized) {
+          loadMap();
+          window.publisherMapInitialized = true;
+        }
+      } else {
+        setTimeout(() => mapView.style.display = "none", 300);
+      }
+    }
+  });
+  %>
+</script>
+
+<script>
+  document.addEventListener("turbolinks:load", function () {
+      setTimeout(() => {
+        $('.filterName, .filterValue').each(function () {
+          const rawText = $(this).text().replace(/\s+/g, ' ').trim();
+          const anyMatch = rawText.match(/^\["any"\]\s*(.*)$/i);
+          if (anyMatch) {
+            const valueOnly = anyMatch[1].trim();
+            const className = $(this).attr('class');
+
+            if (className.includes('filterName')) {
+              $(this).text('Any');
+            } else if (className.includes('filterValue')) {
+              $(this).text(valueOnly).attr('title', valueOnly);
+            }
+          }
+        });
+      }, 500); 
+
+
+      // Find all the constraint-value spans
+      const constraintSpans = document.querySelectorAll('.constraint-value');
+
+      constraintSpans.forEach(function (span) {
+          // Get the raw query text directly from the span
+          const rawSearchParams = span.textContent.trim(); // Extract text content
+        
+          if (rawSearchParams) {
+              // Convert the raw search params to human-readable format
+              const humanReadable = humanReadableFilters(rawSearchParams);
+
+              // Find the elements where we want to update the text
+              const filterNameElement = span.querySelector('.filterName');
+              const filterValueElement = span.querySelector('.filterValue');
+
+              // Update the filter display
+              if (filterNameElement) {
+                  filterNameElement.textContent = humanReadable;
+              }
+              if (filterValueElement) {
+                  filterValueElement.setAttribute('title', humanReadable); // Update the tooltip
+                  filterValueElement.textContent = humanReadable;
+              }
+              // document.addEventListener("turbolinks:load", humanReadableFilters(rawSearchParams));
+              // document.addEventListener("ajax:success", humanReadableFilters(rawSearchParams));
+          }
+      });
+      
+      function humanReadableFilters(searchParams) {
+          const filterDescriptions = [];
+          
+          // Decode HTML entities (e.g. &quot; -> ")
+          let txt = document.createElement("textarea");
+          txt.innerHTML = searchParams;
+          searchParams = txt.value;
+
+          // 0. Pre-process: Remove internal "records without dates" clause
+          // This clause is: OR (*:* NOT date_created_tesim:*)
+          // We remove it so it doesn't show up in the UI
+          searchParams = searchParams.replace(/\s*OR\s*\(\*:\*\s*NOT\s*date_created_tesim:\*\)/g, '');
+
+          // 1. Pre-process: Collapse "Any Field" query groups
+          // The pattern is a group of ORs across many fields. We look for the start (abstract_tesim) and end (digital_object_identifier_tesim)
+          // and extract the value.
+          // Example: (abstract_tesim:*Michael* OR ... OR digital_object_identifier_tesim:*Michael*)
+          // We use a non-greedy match for the content in between
+          let processedParams = searchParams.replace(/\(abstract_tesim:(.*?) OR .*?digital_object_identifier_tesim:.*?\)/g, (match, val) => {
+             // Extract the value from the first field match
+             // val is captured from abstract_tesim:VAL
+             return `Any_Field:${val}`;
+          });
+
+          // 2. Main Regex to parse fields
+          // Supports _tesim, _sim, _ssort, and our custom _Field
+          // Handles escaped characters in value (e.g. Michael\ Davitt)
+          let matches = [...processedParams.matchAll(/\(?([^:()]+)(?:_(?:te?sim|ssort|sim)|_Field):([*"\[]?)((\\.|[^*\]"])+)([*"\]]?)\)?/g)];
+          
+          // Match logical operators (AND, OR, NOT)
+          let operators = [...processedParams.matchAll(/\s+(AND|OR|NOT)\s+/g)].map(op => op[1]);
+
+          if (matches.length === 0) {
+              return searchParams;
+          }
+
+          // 3. Post-process: Merge consecutive filters for the same field and operator
+          // This turns "Copyright contains 'michael' AND Copyright contains 'davitt'" 
+          // into "Copyright contains 'michael davitt'"
+          let mergedMatches = [];
+          matches.forEach((match, index) => {
+              let field = match[1].replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+              let rawQuery = match[3];
+              let prefix = match[2], suffix = match[5];
+              let operator = "contains";
+              
+              // Unescape the query value
+              let query = rawQuery.replace(/\\(.)/g, '$1');
+
+              if (field === "Any") field = "Any Field";
+
+              // Determine operator
+              if (prefix === '*' && suffix === '*') operator = "contains";
+              else if (suffix === '*') operator = "starts with";
+              else if (prefix === '"' && suffix === '"') operator = "equals";
+
+              // Check if we can merge with the previous item
+              let lastItem = mergedMatches[mergedMatches.length - 1];
+              if (lastItem && lastItem.field === field && lastItem.operator === operator && operator === "contains") {
+                  // Append current query to the previous one
+                  lastItem.query += " " + query;
+              } else {
+                  // Add new item ONLY if field and query are valid
+                  if (field && query) {
+                      mergedMatches.push({
+                          field: field,
+                          operator: operator,
+                          query: query,
+                          isDate: (field === "Date Created" && prefix === "[" && suffix === "]")
+                      });
+                  }
+              }
+          });
+
+          // 4. Generate Descriptions
+          mergedMatches.forEach((item) => {
+              let description = "";
+              if (item.isDate) {
+                  // Date logic (preserved)
+                  let dateRange = item.query.split("TO");
+                  if (dateRange.length === 2) {
+                      dateRange = dateRange.map(year => {
+                          year = year.trim();
+                          if (year.startsWith('-')) return `${Math.abs(year)} BCE`;
+                          return `${Math.abs(year)} CE`;
+                      });
+                      description = `${item.field} From ${dateRange[0]} To ${dateRange[1]}`;
+                  } else {
+                      if (item.query.startsWith('-')) description = `${item.field} ${Math.abs(item.query)} BCE`;
+                      else description = `${item.field} ${Math.abs(item.query)} CE`;
+                  }
+              } else {
+                  description = `${item.field} ${item.operator} "${item.query}"`;
+              }
+              
+              if (description && description.trim() !== "") {
+                  filterDescriptions.push(description);
+              }
+          });
+
+          return filterDescriptions.join(' AND ');
+      }
+
+
+
+
+  });
+</script>
+
+<script type="text/javascript">
+  function mergeFacets(primarySelector, secondarySelector, newClass, newLabel) {
+    const primaryPanel = document.querySelector(primarySelector);
+    const secondaryPanel = document.querySelector(secondarySelector);
+
+    if (!primaryPanel && !secondaryPanel) {
+      return;
+    }
+
+    // Check if any of the original facets were open
+    const wasOpen = (primaryPanel && primaryPanel.querySelector('.facet-content').classList.contains('in')) || 
+                    (secondaryPanel && secondaryPanel.querySelector('.facet-content').classList.contains('in'));
+
+    // Create merged panel
+    const mergedPanel = document.createElement("div");
+    mergedPanel.classList.add("panel", "panel-default", "facet_limit", newClass);
+
+    let facetList = "";
+    if (primaryPanel) {
+      facetList += primaryPanel.querySelector(".facet-values").innerHTML;
+    }
+    if (secondaryPanel) {
+      facetList += secondaryPanel.querySelector(".facet-values").innerHTML;
+    }
+
+    mergedPanel.innerHTML = `
+      <div class="collapse-toggle panel-heading" aria-expanded="${wasOpen}" data-toggle="collapse" data-target="#facet-${newClass}">
+        <h3 class="panel-title facet-field-heading">
+          <a data-turbolinks="false" data-no-turbolink="true" href="#">${newLabel}</a>
+        </h3>
+      </div>
+      <div id="facet-${newClass}" class="panel-collapse facet-content collapse ${wasOpen ? 'in' : ''}" aria-expanded="${wasOpen}">
+        <div class="panel-body">
+          <ul class="facet-values list-unstyled">
+            ${facetList}
+          </ul>
+        </div>
+      </div>
+    `;
+
+    if (primaryPanel) {
+      primaryPanel.parentNode.insertBefore(mergedPanel, primaryPanel);
+    } else if (secondaryPanel) {
+      secondaryPanel.parentNode.insertBefore(mergedPanel, secondaryPanel);
+    }
+
+    // Remove original panels
+    if (primaryPanel) primaryPanel.remove();
+    if (secondaryPanel) secondaryPanel.remove();
+  }
+
+  function applyFacetMerging() {
+    mergeFacets(".blacklight-keyword_sim", ".blacklight-subject_sim", "blacklight-keyword_subject", "Keyword/Subject");
+    mergeFacets(".blacklight-creator_sim", ".blacklight-contributor_sim", "blacklight-creator_contributor", "Creator/Contributor");
+  }
+
+  // Highlighting Logic
+  function highlightSearchTerms() {
+      const urlParams = new URLSearchParams(window.location.search);
+      let terms = [];
+
+      // 1. Get terms from 'q' parameter
+      if (urlParams.has('q')) {
+          const q = urlParams.get('q');
+          
+          // Better parsing for Solr queries
+          // 1. Split by space, but respect quotes
+          const parts = q.match(/(?:[^\s"]+|"[^"]*")+/g) || [];
+          
+          parts.forEach(part => {
+              // Check if it's a field search (field:value)
+              if (part.includes(':')) {
+                  // Extract value after the last colon (handle cases like field:"val:ue")
+                  let value = part.substring(part.indexOf(':') + 1);
+                  
+                  // Ignore range queries (e.g. [1900 TO 2000])
+                  if (value.startsWith('[') || value.startsWith('{')) return;
+                  
+                  part = value;
+              }
+              
+              // Clean up the term
+              // Remove quotes, wildcards, parentheses, and fuzzy/boost operators
+              let clean = part.replace(/["'*()^~]/g, '');
+              
+              // Filter out boolean operators and common stop words
+              if (clean.length > 2 && !['AND', 'OR', 'NOT', 'TO', 'in', 'for'].includes(clean)) {
+                  terms.push(clean);
+              }
+          });
+      }
+
+      // 2. Get terms from advanced search fields (f params are usually facets, but advanced search might use others)
+      // In this app, advanced search seems to construct a complex 'q'. 
+      // But if there are other params, we could check them. 
+      // For now, parsing 'q' is the most reliable way as it contains the actual query sent to Solr.
+
+      if (terms.length === 0) return;
+
+      // Unique terms
+      terms = [...new Set(terms)];
+
+      // 3. Highlight in DOM
+      const cards = document.querySelectorAll('.ajax-result-card');
+      cards.forEach(card => {
+          const walker = document.createTreeWalker(card, NodeFilter.SHOW_TEXT, null, false);
+          let node;
+          const nodesToReplace = [];
+
+          while (node = walker.nextNode()) {
+              // Skip if already highlighted or in script/style
+              if (node.parentNode.classList.contains('search-highlight') || 
+                  ['SCRIPT', 'STYLE'].includes(node.parentNode.tagName)) continue;
+
+              let text = node.nodeValue;
+              let hasMatch = false;
+
+              // Check for matches
+              terms.forEach(term => {
+                  // Escape special regex characters in the term
+                  const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                  // Match whole words only to avoid partial highlighting of unrelated words
+                  // But allow for partial matches if the user searched for a wildcard? 
+                  // User request: "Whatever Search Term is seached by user will be heighlighted"
+                  // Usually highlighting works on whole words or significant parts.
+                  // Let's stick to case-insensitive match, but maybe boundary check?
+                  // If I search "photo", I expect "photograph" to highlight "photo"? 
+                  // Or "photograph" to be highlighted?
+                  // Let's use the term as is.
+                  const regex = new RegExp(`(${escapedTerm})`, 'gi');
+                  if (regex.test(text)) {
+                      hasMatch = true;
+                  }
+              });
+
+              if (hasMatch) {
+                  nodesToReplace.push(node);
+              }
+          }
+
+          // Replace nodes
+          nodesToReplace.forEach(node => {
+              let html = node.nodeValue;
+              terms.forEach(term => {
+                  const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                  const regex = new RegExp(`(${escapedTerm})`, 'gi');
+                  html = html.replace(regex, '<span class="search-highlight">$1</span>');
+              });
+              
+              const span = document.createElement('span');
+              span.innerHTML = html;
+              node.parentNode.replaceChild(span, node);
+          });
+      });
+  }
+
+  // Run on initial page load
+  document.addEventListener("DOMContentLoaded", () => {
+      applyFacetMerging();
+      highlightSearchTerms();
+  });
+
+  // Re-run on AJAX navigation (Blacklight uses Turbolinks/AJAX)
+  document.addEventListener("turbolinks:load", () => {
+      applyFacetMerging();
+      highlightSearchTerms();
+  });
+  
+  document.addEventListener("ajax:success", (event) => {
+      // Small delay to ensure DOM is updated
+      setTimeout(() => {
+          applyFacetMerging();
+          highlightSearchTerms();
+      }, 100);
+  });
+</script>
+
+

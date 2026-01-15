@@ -1,0 +1,143 @@
+/* jQuery UI Autocomplete Styling - Modern & Google-like */
+
+/* Autocomplete dropdown container */
+.ui-autocomplete {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 9999 !important;
+    background-color: #fff;
+    border: 1px solid #e0e0e0;
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    max-height: 320px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    font-family: inherit;
+}
+
+/* Individual autocomplete items */
+.ui-menu-item {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    border-bottom: 1px solid #f5f5f5;
+}
+
+.ui-menu-item:last-child {
+    border-bottom: none;
+}
+
+.ui-menu-item>div {
+    padding: 12px 16px;
+    cursor: pointer;
+    color: #333;
+    font-size: 14px;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: all 0.15s ease;
+}
+
+/* Hover and active states */
+.ui-menu-item>div:hover,
+.ui-state-active,
+.ui-state-focus {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    color: #fff !important;
+    border: none !important;
+    margin: 0 !important;
+}
+
+/* Bold matching text */
+.ui-menu-item strong {
+    font-weight: 600;
+    color: inherit;
+}
+
+.ui-menu-item>div:hover strong,
+.ui-state-active strong,
+.ui-state-focus strong {
+    color: #fff !important;
+}
+
+/* Custom scrollbar */
+.ui-autocomplete::-webkit-scrollbar {
+    width: 6px;
+}
+
+.ui-autocomplete::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 0 0 8px 0;
+}
+
+.ui-autocomplete::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 3px;
+}
+
+.ui-autocomplete::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Remove jQuery UI default styling */
+.ui-widget-content {
+    border: none;
+    background: none;
+}
+
+.ui-corner-all {
+    border-radius: 0;
+}
+
+/* Enhanced search field with animated gradient border */
+#search-field-header {
+    transition: all 0.3s ease;
+    border: 2px solid #e0e0e0;
+    position: relative;
+}
+
+/* Animated gradient border on focus */
+#search-field-header:focus,
+#search-field-header.ui-autocomplete-input:focus {
+    outline: none;
+    border: 2px solid transparent;
+    background-image:
+        linear-gradient(white, white),
+        linear-gradient(90deg, #667eea, #764ba2, #f093fb, #4facfe, #00f2fe, #667eea);
+    background-origin: border-box;
+    background-clip: padding-box, border-box;
+    background-size: 100% 100%, 300% 300%;
+    animation: gradientRotate 3s linear infinite;
+}
+
+@keyframes gradientRotate {
+    0% {
+        background-position: 0% 50%, 0% 50%;
+    }
+
+    50% {
+        background-position: 0% 50%, 100% 50%;
+    }
+
+    100% {
+        background-position: 0% 50%, 0% 50%;
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .ui-autocomplete {
+        max-height: 240px;
+    }
+
+    .ui-menu-item>div {
+        padding: 10px 14px;
+        font-size: 13px;
+    }
+}

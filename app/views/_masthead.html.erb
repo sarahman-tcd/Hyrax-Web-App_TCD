@@ -16,6 +16,65 @@
       </div>
     </div>
   </nav>
-   <div class="TCD_library_bar TCD-library-text">Digital Collections</div>
-   <div class="TCD_small_library_bar TCD-small-library-text">The Library of Trinity College Dublin</div>
+   
+  <div class="row" style="background-color: #1074b7;">
+    <div class="col-md-12">
+      <div class="col-md-9">
+        <div class="TCD_library_bar TCD-library-text">Digital Collections</div>
+        <div class="TCD_small_library_bar TCD-small-library-text">The Library of Trinity College Dublin</div>
+      </div>
+      <div class="col-md-3" style="padding-top:10px; text-align: right; display: inline-block;">
+        <div>
+          <ul class="custom-nav">  
+            <li <%= 'class=active' if current_page?(hyrax.root_path) %>>
+              <%= link_to t(:'hyrax.controls.home'), hyrax.root_path, aria: current_page?(hyrax.root_path) ? {current: 'page'} : nil %></li>
+            <li <%= 'class=active' if current_page?(hyrax.about_path) %>>
+              <%= link_to t(:'hyrax.controls.about'), hyrax.about_path, aria: current_page?(hyrax.about_path) ? {current: 'page'} : nil %></li>
+            <li <%= 'class=active' if current_page?(hyrax.contact_path) %>>
+              <%= link_to t(:'hyrax.controls.contact'), hyrax.contact_path, aria: current_page?(hyrax.contact_path) ? {current: 'page'} : nil %></li>
+            <li>
+              <%= link_to t(:'hyrax.controls.virtual_trinity'), 'https://www.tcd.ie/virtual-trinity-library/' %></li>
+            <li>
+              <%= link_to t(:'hyrax.controls.library'), 'https://www.tcd.ie/library' %></li>
+          </ul>
+        </div>
+      </div>
+    
+    
+      
+    </div>
+  </div>
+  
+  
 </header>
+<style>
+.custom-nav {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+}
+
+
+.custom-nav li a {
+    color: white !important;    
+    padding: 10px 15px;
+    display: inline-block;
+    transition: all 0.3s ease-in-out;
+    
+}
+
+
+.custom-nav li:hover {
+    background-color: #0e6097b3; 
+    
+}
+
+
+.custom-nav li:hover a {
+    color: #fff !important; 
+    text-decoration: none;
+}
+
+
+</style>
