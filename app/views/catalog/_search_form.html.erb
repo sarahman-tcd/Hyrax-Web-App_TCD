@@ -190,16 +190,32 @@ document.addEventListener("turbolinks:load", function () {
 
       $('#search-field-header').removeAttr('value');
       
-      // Add Enter key support for advanced search inputs
+      // Add Enter key support for search inputs
       document.addEventListener('keypress', function(e) {
         // Check if Enter key was pressed
         if (e.key === 'Enter' || e.keyCode === 13) {
-          // Check if the target is a search input field in advanced search
-          if (e.target.classList.contains('q') || 
-              e.target.id === 'search-field-header') {
+          // Check if the target is a search input field
+          if (e.target.classList.contains('q') || e.target.id === 'search-field-header') {
             e.preventDefault();
-            // Submit the search form
-            document.getElementById('search-form-header').submit();
+            
+            const advancedPanel = document.querySelector(".advanced-search-panel");
+            const isAdvancedVisible = advancedPanel && advancedPanel.style.display !== 'none';
+            
+            if (isAdvancedVisible) {
+              // Trigger Advanced Search button click
+              const advSearchButton = document.getElementById('search-button');
+              if (advSearchButton) {
+                advSearchButton.click();
+              }
+            } else {
+              // Trigger Simple Search button click
+              const simpleSearchButton = document.getElementById('search-submit-header');
+              if (simpleSearchButton) {
+                simpleSearchButton.click();
+              } else {
+                document.getElementById('search-form-header').submit();
+              }
+            }
           }
         }
       });
