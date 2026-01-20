@@ -1,0 +1,92 @@
+<div class="panel-heading">
+  <div class="row">
+    <div class="col-sm-8">
+      <h3 class="panel-title"><%= t('.title') %></h3>
+      <div class="text-muted">Growth of objects and collections</div>
+    </div>
+    <div class="col-sm-4 text-right">
+      <select id="repository-growth-period" class="form-control input-sm" style="display: inline-block; width: auto; border-radius: 4px; border: 1px solid #ccc; padding: 2px 10px;">
+        <option value="90">Past 3 Months</option>
+        <option value="180">Past 6 Months</option>
+        <option value="365">Past 1 Year</option>
+        <option value="1095">Past 3 Years</option>
+        <option value="1825">Past 5 Years</option>
+      </select>
+    </div>
+  </div>
+</div>
+<div class="panel-body text-center">
+  <% repository_growth = @presenter.repository_growth.to_json %>
+  <div id="dashboard-growth" aria-hidden="true" style="height: 200px"><script>
+//<![CDATA[
+Hyrax.statistics.repositoryGrowth = <%== repository_growth %>
+//]]>
+</script></div>
+  <table id="growth-table" aria-label="<%= t('.title') %>, <%= t('.subtitle') %>" class="table table-striped sr-only text-left">
+    <thead>
+      <tr>
+        <th><%= t('.date') %></th>
+        <th><%= t('.objects') %></th>
+        <th><%= t('.collections') %></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% JSON.parse(repository_growth).each do |row| %>
+        <tr>
+          <td><%= row["y"] %></td>
+          <td><%= row["a"] %></td>
+          <td><%= row["b"] %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
+
+<script>
+  $(document).on('turbolinks:load', function() {
+    var growthChart;
+    
+    // We need to wait a bit for Hyrax's AdminGraphs to initialize if it's the first load
+    // Or we can just re-initialize it ourselves if we want full control.
+    
+    $('#repository-growth-period').on('change', function() {
+      var days = $(this).val();
+      var $panel = $(this).closest('.panel');
+      $panel.css('opacity', '0.5');
+      
+      $.ajax({
+        url: '/dashboard/repository_growth_data',
+        data: { days: days },
+        success: function(data) {
+          $panel.css('opacity', '1');
+          $('#dashboard-growth').empty();
+          
+          Morris.Line({
+             element: 'dashboard-growth',
+             data: data,
+             xkey: 'y',
+             ykeys: ['a','b'],
+             labels: ['Objects','Collections'],
+             resize: true,
+             hideHover: true,
+             xLabels: days > 365 ? 'month' : 'day',
+             gridTextSize: '10px',
+             lineColors: ['#3FBAE4','#33414E'],
+             gridLineColor: '#E5E5E5'
+          });
+          
+          // Update table for accessibility
+          var tbody = $('#growth-table tbody');
+          tbody.empty();
+          data.forEach(function(row) {
+            tbody.append('<tr><td>' + row.y + '</td><td>' + row.a + '</td><td>' + row.b + '</td></tr>');
+          });
+        },
+        error: function() {
+          $panel.css('opacity', '1');
+          alert('Failed to load repository growth data.');
+        }
+      });
+    });
+  });
+</script>
