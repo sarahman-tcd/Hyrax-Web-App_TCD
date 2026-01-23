@@ -4,7 +4,7 @@ class CatalogParamsConstraint
   'search_logic', 'q', 'f', 'sort', 'per_page', 'view', 'page', 'logic',
   'field', 'operator', 'keyword', 'rights_statement', 'resource_type',
   'language', 'license', 'location', 'location_filter',
-  'search_rows', 'date_range'   # ← missing ones
+  'search_rows', 'date_range', 'advanced_search'
 ].freeze
 ALLOWED_LOCALES = ['en', 'pt-BR', 'de', 'es', 'fr', 'ga', 'it', 'zh'].freeze
   

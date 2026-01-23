@@ -1071,7 +1071,8 @@ document.addEventListener("turbolinks:load", function () {
           combinedQuery += `(date_created_tesim:[${startYear} TO ${endYear}] OR (*:* NOT date_created_tesim:*))`;
       }
   
-      return new URLSearchParams({ q: combinedQuery }).toString();
+  
+      return new URLSearchParams({ q: combinedQuery, advanced_search: 'true' }).toString();
   }
   
   
