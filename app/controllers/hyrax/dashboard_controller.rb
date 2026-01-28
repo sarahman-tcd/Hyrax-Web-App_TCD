@@ -19,9 +19,18 @@ module Hyrax
 
     def repository_growth_data
       authorize! :read, :admin_dashboard
-      days = params[:days] || 90
-      presenter = Hyrax::Admin::RepositoryGrowthPresenter.new(days)
-      render json: presenter.as_json
+      range_type = params[:range_type] || 'months'
+      value = params[:value] || 6
+      data = Hyrax::AdminSetService.new(self).repository_object_growth_data(:read, range_type: range_type, value: value)
+      render json: data
+    end
+
+    def repository_image_growth_data
+      authorize! :read, :admin_dashboard
+      range_type = params[:range_type] || 'months'
+      value = params[:value] || 6
+      data = Hyrax::AdminSetService.new(self).repository_image_growth_data(:read, range_type: range_type, value: value)
+      render json: data
     end
   end
 end
