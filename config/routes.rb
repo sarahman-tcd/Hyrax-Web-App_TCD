@@ -139,6 +139,7 @@ Rails.application.routes.draw do
 
   mount Qa::Engine => '/authorities'
   get '/dashboard/repository_growth_data', to: 'hyrax/dashboard#repository_growth_data'
+  get '/dashboard/repository_image_growth_data', to: 'hyrax/dashboard#repository_image_growth_data'
   mount Hyrax::Engine, at: '/'
   resources :welcome, only: 'index'
   # root 'hyrax/homepage#index'
