@@ -57,34 +57,36 @@ module Hyrax
       ids = admin_sets.map(&:id).join(',')
       join_query = "{!join from=file_set_ids_ssim to=id}{!terms f=isPartOf_ssim}#{ids}"
       current_time = Time.now.utc
-      data = []
-
+      
       if range_type == 'months'
-        (0..(value.to_i - 1)).reverse_each do |i|
-          date = current_time.beginning_of_month - i.months
-          start_date = date.strftime("%Y-%m-01T00:00:00Z")
-          end_date = (date + 1.month).strftime("%Y-%m-01T00:00:00Z")
-          label = date.strftime("%Y-%m")
-          
-          date_query = "system_create_dtsi:[#{start_date} TO #{end_date}}"
-          file_results = ActiveFedora::SolrService.instance.conn.get(
-            ActiveFedora::SolrService.select_path,
-            params: { fq: [join_query, "has_model_ssim:FileSet", date_query], rows: 0 }
-          )
-          data << { y: label, a: file_results['response']['numFound'] }
-        end
-      else # years
-        current_year = current_time.year
-        ((current_year - (value.to_i - 1))..current_year).each do |year|
-          start_date = "#{year}-01-01T00:00:00Z"
-          end_date = "#{year + 1}-01-01T00:00:00Z"
-          date_query = "system_create_dtsi:[#{start_date} TO #{end_date}}"
-          file_results = ActiveFedora::SolrService.instance.conn.get(
-            ActiveFedora::SolrService.select_path,
-            params: { fq: [join_query, "has_model_ssim:FileSet", date_query], rows: 0 }
-          )
-          data << { y: year.to_s, a: file_results['response']['numFound'] }
-        end
+        start_date = (current_time.beginning_of_month - (value.to_i - 1).months).strftime("%Y-%m-01T00:00:00Z")
+        end_date = (current_time.beginning_of_month + 1.month).strftime("%Y-%m-01T00:00:00Z")
+        gap = "+1MONTH"
+        format = "%Y-%m"
+      else
+        start_date = (current_time.beginning_of_year - (value.to_i - 1).years).strftime("%Y-01-01T00:00:00Z")
+        end_date = (current_time.beginning_of_year + 1.year).strftime("%Y-01-01T00:00:00Z")
+        gap = "+1YEAR"
+        format = "%Y"
+      end
+
+      solr_params = {
+        fq: [join_query, "has_model_ssim:FileSet"],
+        rows: 0,
+        facet: true,
+        'facet.range' => 'system_create_dtsi',
+        'facet.range.start' => start_date,
+        'facet.range.end' => end_date,
+        'facet.range.gap' => gap
+      }
+
+      results = ActiveFedora::SolrService.instance.conn.get(ActiveFedora::SolrService.select_path, params: solr_params)
+      facet_counts = results['facet_counts']['facet_ranges']['system_create_dtsi']['counts']
+      
+      data = []
+      facet_counts.each_slice(2) do |date_str, count|
+        label = Time.parse(date_str).strftime(format)
+        data << { y: label, a: count }
       end
       data
     end
@@ -94,50 +96,48 @@ module Hyrax
       ids = admin_sets.map(&:id).join(',')
       work_query = "{!terms f=isPartOf_ssim}#{ids}"
       collection_query = "has_model_ssim:Collection"
-      
       current_time = Time.now.utc
-      data = []
 
       if range_type == 'months'
-        (0..(value.to_i - 1)).reverse_each do |i|
-          date = current_time.beginning_of_month - i.months
-          start_date = date.strftime("%Y-%m-01T00:00:00Z")
-          end_date = (date + 1.month).strftime("%Y-%m-01T00:00:00Z")
-          label = date.strftime("%Y-%m")
-          
-          date_query = "system_create_dtsi:[#{start_date} TO #{end_date}}"
-          
-          work_results = ActiveFedora::SolrService.instance.conn.get(
-            ActiveFedora::SolrService.select_path,
-            params: { fq: [work_query, date_query], rows: 0 }
-          )
-          
-          collection_results = ActiveFedora::SolrService.instance.conn.get(
-            ActiveFedora::SolrService.select_path,
-            params: { fq: [collection_query, "system_create_dtsi:[#{start_date} TO #{end_date}}"], rows: 0 }
-          )
-          
-          data << { y: label, a: work_results['response']['numFound'], b: collection_results['response']['numFound'] }
-        end
-      else # years
-        current_year = current_time.year
-        ((current_year - (value.to_i - 1))..current_year).each do |year|
-          start_date = "#{year}-01-01T00:00:00Z"
-          end_date = "#{year + 1}-01-01T00:00:00Z"
-          date_query = "system_create_dtsi:[#{start_date} TO #{end_date}}"
-          
-          work_results = ActiveFedora::SolrService.instance.conn.get(
-            ActiveFedora::SolrService.select_path,
-            params: { fq: [work_query, date_query], rows: 0 }
-          )
-          
-          collection_results = ActiveFedora::SolrService.instance.conn.get(
-            ActiveFedora::SolrService.select_path,
-            params: { fq: [collection_query, "system_create_dtsi:[#{start_date} TO #{end_date}}"], rows: 0 }
-          )
-          
-          data << { y: year.to_s, a: work_results['response']['numFound'], b: collection_results['response']['numFound'] }
-        end
+        start_date = (current_time.beginning_of_month - (value.to_i - 1).months).strftime("%Y-%m-01T00:00:00Z")
+        end_date = (current_time.beginning_of_month + 1.month).strftime("%Y-%m-01T00:00:00Z")
+        gap = "+1MONTH"
+        format = "%Y-%m"
+      else
+        start_date = (current_time.beginning_of_year - (value.to_i - 1).years).strftime("%Y-01-01T00:00:00Z")
+        end_date = (current_time.beginning_of_year + 1.year).strftime("%Y-01-01T00:00:00Z")
+        gap = "+1YEAR"
+        format = "%Y"
+      end
+
+      common_params = {
+        rows: 0,
+        facet: true,
+        'facet.range' => 'system_create_dtsi',
+        'facet.range.start' => start_date,
+        'facet.range.end' => end_date,
+        'facet.range.gap' => gap
+      }
+
+      # Query for Works
+      work_results = ActiveFedora::SolrService.instance.conn.get(
+        ActiveFedora::SolrService.select_path,
+        params: common_params.merge(fq: [work_query])
+      )
+      work_counts = work_results['facet_counts']['facet_ranges']['system_create_dtsi']['counts']
+
+      # Query for Collections
+      collection_results = ActiveFedora::SolrService.instance.conn.get(
+        ActiveFedora::SolrService.select_path,
+        params: common_params.merge(fq: [collection_query])
+      )
+      collection_counts = collection_results['facet_counts']['facet_ranges']['system_create_dtsi']['counts']
+
+      data = []
+      work_counts.each_slice(2).with_index do |(date_str, work_count), index|
+        collection_count = collection_counts[index * 2 + 1]
+        label = Time.parse(date_str).strftime(format)
+        data << { y: label, a: work_count, b: collection_count }
       end
       data
     end
