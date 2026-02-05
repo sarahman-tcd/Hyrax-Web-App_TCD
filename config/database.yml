@@ -19,14 +19,9 @@ default: &default
 #   password: <%= ENV['HYRAX_DATABASE_PASSWORD'] || '#Pa$$w0rd' %>
 
 development:
-  adapter: mysql2
-  encoding: utf8mb4
-  host: localhost
-  database: hyrax
+  <<: *default
   username: hyraxuser
   password: "#Pa$$w0rd"
-
-
 
 demovm045:
   <<: *default
@@ -52,8 +47,8 @@ dcdevhyrax:
 test:
   <<: *default
   database: <%= ENV['HYRAX_TEST_DATABASE_NAME'] || 'test_hyrax' %>
-  username: <%= ENV['MYSQL_USER'] || 'travis' %>
-  password: <%= ENV['MYSQL_PASSWORD'] || 'Pa$$w0rd' %>
+  username: hyraxuser
+  password: "#Pa$$w0rd"
 
 production:
   <<: *default

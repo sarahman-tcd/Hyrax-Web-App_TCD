@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20220301123641) do
+ActiveRecord::Schema.define(version: 20260205161457) do
 
   create_table "bookmarks", id: :integer, force: :cascade, options: "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci" do |t|
     t.integer "user_id", null: false
@@ -413,6 +413,22 @@ ActiveRecord::Schema.define(version: 20220301123641) do
     t.datetime "updated_at", null: false
     t.index ["local_authority_id"], name: "index_qa_local_authority_entries_on_local_authority_id"
     t.index ["uri"], name: "index_qa_local_authority_entries_on_uri", unique: true
+  end
+
+  create_table "qa_mesh_trees", id: :integer, force: :cascade, options: "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci" do |t|
+    t.string "term_id"
+    t.string "tree_number"
+    t.index ["term_id"], name: "index_qa_mesh_trees_on_term_id"
+    t.index ["tree_number"], name: "index_qa_mesh_trees_on_tree_number"
+  end
+
+  create_table "qa_subject_mesh_terms", id: :integer, force: :cascade, options: "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci" do |t|
+    t.string "term_id"
+    t.string "term"
+    t.text "synonyms"
+    t.string "term_lower"
+    t.index ["term_id"], name: "index_qa_subject_mesh_terms_on_term_id"
+    t.index ["term_lower"], name: "index_qa_subject_mesh_terms_on_term_lower"
   end
 
   create_table "recent_dois", force: :cascade, options: "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci" do |t|
