@@ -238,11 +238,20 @@ end
     search_params[:sort] = params[:sort] || blacklight_config.sort_fields.keys.first
     search_params[:per_page] = params[:per_page] || 10
 
-    date_range_match = search_params[:q].match(/date_created_tesim:\[(-?\d{1,4})TO(-?\d{1,4})\]/)    
-    if date_range_match
-      start_year, end_year = date_range_match.captures.map(&:to_i)
-      search_params[:q].sub!(/AND?\s*\(?date_created_tesim:\[.*?\]\)?/, '') 
-    end   
+    # Initialize date range variables
+    start_year = nil
+    end_year = nil
+    date_range_match = nil
+    
+    # Extract date range if present in query
+    if search_params[:q].present?
+      date_range_match = search_params[:q].match(/date_created_tesim:\[(-?\d{1,4})TO(-?\d{1,4})\]/)    
+      if date_range_match
+        start_year, end_year = date_range_match.captures.map(&:to_i)
+        search_params[:q].sub!(/AND?\s*\(?date_created_tesim:\[.*?\]\)?/, '') 
+      end
+    end
+    
     Rails.logger.debug "this: search param without date: #{search_params}"
 
     if params[:location_filter].present?
@@ -263,15 +272,64 @@ end
       return
     end
 
-    search_params[:rows] = params[:rows] || 10
 
-    @response, @documents = search_results(search_params)
- 
     if start_year && end_year && date_range_match
+      # Fetch ALL results to filter them in Ruby - use batch fetching
+      Rails.logger.debug "Date range detected: #{start_year} to #{end_year}, fetching all results"
+      
+      all_documents = []
+      current_page_num = 1
+      batch_size = 100
+      first_response = nil
+      
+      loop do
+        batch_params = search_params.dup
+        batch_params.delete(:rows)  # Remove any existing rows setting
+        batch_params[:page] = current_page_num
+        batch_params[:rows] = batch_size
+        batch_params[:per_page] = batch_size  # Also set per_page in case that's what's used
+        
+        response, docs = search_results(batch_params)
+        first_response ||= response  # Capture the first response
+        Rails.logger.debug "Batch #{current_page_num}: fetched #{docs.size} documents (requested #{batch_size})"
+        
+        all_documents.concat(docs)
+        
+        break if docs.size < batch_size
+        current_page_num += 1
+      end
+      
+      Rails.logger.debug "Total documents fetched from Solr: #{all_documents.count}"
+      
+      # Use the first response for metadata
+      @response = first_response
+      
       user_input = "#{start_year},#{end_year}"
       Rails.logger.debug "User input date range: #{user_input}"
-      @documents = filter_documents_by_date_range(@documents, user_input)
-      Rails.logger.debug "filtered_results: #{@documents.count}"
+      
+      filtered_documents = filter_documents_by_date_range(all_documents, user_input)
+      Rails.logger.debug "filtered_results: #{filtered_documents.count}"
+      
+      # Manual Pagination
+      current_page = (params[:page] || 1).to_i
+      per_page = (params[:rows] || 10).to_i
+      total_count = filtered_documents.count
+      
+      Rails.logger.debug "Pagination params: page=#{current_page}, per_page=#{per_page}, total=#{total_count}"
+      
+      # Use Kaminari to paginate the array so view helpers work correctly
+      @documents = Kaminari.paginate_array(filtered_documents, total_count: total_count).page(current_page).per(per_page)
+      
+      Rails.logger.debug "Kaminari object created: #{@documents.class.name}"
+      Rails.logger.debug "Kaminari total_count: #{@documents.total_count}"
+      Rails.logger.debug "Kaminari current_page: #{@documents.current_page}"
+      Rails.logger.debug "Kaminari total_pages: #{@documents.total_pages}"
+      Rails.logger.debug "Documents on this page: #{@documents.count}"
+      
+      update_response_after_filter!(@response, total_count)
+    else
+      search_params[:rows] = params[:rows] || 10
+      @response, @documents = search_results(search_params)
     end
     
     respond_to do |format|
@@ -284,6 +342,71 @@ end
     render json: { error: 'An error occurred during the search.', details: e.message }, status: :internal_server_error
   end
 end
+
+  # AJAX endpoint for date-filtered search with custom pagination
+  def filtered_search
+    begin
+      # Remove custom params that shouldn't go to Solr
+      # Also remove Rails/form params
+      search_params = params.to_unsafe_h.deep_symbolize_keys.except(
+        :start_year, :end_year, :action, :controller, :format, :utf8, :commit, :page, :per_page
+      )
+      
+      # Handle empty query - if it's just the date filter, q might become empty
+      if search_params[:q].present? && search_params[:q].strip.empty?
+        search_params.delete(:q)
+      end
+      
+      Rails.logger.debug "AJAX filtered_search params passed to fetch: #{search_params.inspect}"
+      
+      # Force Solr to use lucene parser for explicit field queries
+      search_params[:defType] = 'lucene'
+      
+      # Extract pagination params
+      page = (params[:page] || 1).to_i
+      per_page = (params[:per_page] || 10).to_i
+      
+      Rails.logger.debug "AJAX filtered_search: page=#{page}, per_page=#{per_page}"
+      
+      # Fetch all matching documents
+      all_docs = fetch_all_documents_for_filter(search_params)
+      Rails.logger.debug "Fetched #{all_docs.count} total documents"
+      
+      # Filter by date range if provided
+      if params[:start_year].present? && params[:end_year].present?
+        user_input = "#{params[:start_year]},#{params[:end_year]}"
+        filtered_docs = filter_documents_by_date_range(all_docs, user_input)
+        Rails.logger.debug "Filtered to #{filtered_docs.count} documents"
+      else
+        filtered_docs = all_docs
+      end
+      
+      # Manual pagination
+      total = filtered_docs.count
+      start_idx = (page - 1) * per_page
+      page_docs = filtered_docs[start_idx, per_page] || []
+      
+      # Convert documents to hashes for JSON
+      docs_json = page_docs.map { |doc| document_to_hash(doc) }
+      
+      # Return JSON
+      render json: {
+        documents: docs_json,
+        pagination: {
+          current_page: page,
+          per_page: per_page,
+          total_count: total,
+          total_pages: (total.to_f / per_page).ceil,
+          start_index: start_idx + 1,
+          end_index: [start_idx + per_page, total].min
+        }
+      }
+    rescue => e
+      Rails.logger.error "Error in filtered_search: #{e.message}"
+      Rails.logger.error e.backtrace.join("\n")
+      render json: { error: e.message }, status: :internal_server_error
+    end
+  end
 
 #--------Advance Search------#
  
@@ -392,6 +515,74 @@ def filter_documents_by_date_range(documents, user_range)
     extracted_years.any? { |year| year.between?(start_year, end_year) }
   end
 end
+
+def update_response_after_filter!(response, total_count)
+  response['response'] ||= {}
+  response['response']['numFound'] = total_count
+  
+  per_page = (params[:rows] || params[:per_page] || 10).to_i
+  current_page = params[:page].present? ? params[:page].to_i : 1
+  response['response']['start'] = per_page * (current_page - 1)
+  
+  # CRITICAL: Update the rows value so Blacklight's view uses the correct per_page
+  response['responseHeader'] ||= {}
+  response['responseHeader']['params'] ||= {}
+  response['responseHeader']['params']['rows'] = per_page
+  
+  # Also set it on the response object itself if it has that method
+  if response.respond_to?(:rows=)
+    response.rows = per_page
+  elsif response.respond_to?(:[]=)
+    response['rows'] = per_page
+  end
+  
+  Rails.logger.debug "Response updated: numFound=#{total_count}, start=#{response['response']['start']}, rows=#{per_page}"
+end
+
+def fetch_all_documents_for_filter(search_params)
+  all_docs = []
+  page_num = 1
+  batch_size = 100
+  
+  Rails.logger.debug "fetch_all_documents_for_filter called with: #{search_params.inspect}"
+  
+  loop do
+    batch_params = search_params.dup
+    batch_params.delete(:rows)
+    batch_params[:page] = page_num
+    batch_params[:rows] = batch_size
+    batch_params[:per_page] = batch_size
+    
+    Rails.logger.debug "Calling search_results with batch_params: #{batch_params.inspect}"
+    _, docs = search_results(batch_params)
+    Rails.logger.debug "search_results returned #{docs.size} documents"
+    break if docs.empty?
+    
+    all_docs.concat(docs)
+    break if docs.size < batch_size
+    page_num += 1
+  end
+  
+  Rails.logger.debug "fetch_all_documents_for_filter returning #{all_docs.size} total documents"
+  all_docs
+end
+
+def document_to_hash(doc)
+  {
+    id: doc.id,
+    title: doc['title_tesim']&.first || 'Untitled',
+    creator: doc['creator_tesim'] || [],
+    date_created: doc['date_created_tesim'] || [],
+    publisher: doc['publisher_tesim'] || [],
+    subject: doc['subject_tesim'] || [],
+    identifier: doc['identifier_tesim'] || [],
+    resource_type: doc['resource_type_tesim'] || [],
+    description: doc['description_tesim']&.first,
+    thumbnail: doc['thumbnail_path_ss'],
+    url: "/concern/#{doc['has_model_ssim']&.first&.underscore&.pluralize || 'generic_works'}/#{doc.id}"
+  }
+end
+ 
 
 
 
@@ -564,16 +755,78 @@ end
 def build_combined_query(logic, fields, operators, queries)
    query_parts = []
    
+   # Security: Validate inputs
+   return '*:*' if queries.nil? || fields.nil? || operators.nil?
+   
+   # Whitelist allowed fields
+   allowed_fields = [
+     "any", "title", "creator", "contributor", "description", 
+     "keyword", "publisher", "subject", "identifier", "date_created"
+   ]
+   
+   # Whitelist allowed operators
+   allowed_operators = ["contains", "exact", "equals", "starts_with"]
+   
+   # Whitelist allowed logic operators
+   allowed_logic = ["AND", "OR", "NOT"]
+   
    queries.each_with_index do |query, index|
    next if query.blank?
-
+   
+   # Security: Validate query length (prevent DoS)
+   next if query.length > 1000
+   
    field = fields[index]
    operator = operators[index]
+   
+   # Security: Validate field is in whitelist
+   next unless allowed_fields.include?(field.to_s.downcase)
+   
+   # Security: Validate operator is in whitelist
+   next unless allowed_operators.include?(operator.to_s.downcase)
+   
+   # Security: Validate logic operator if present
+   if index > 0 && logic[index - 1]
+     next unless allowed_logic.include?(logic[index - 1].to_s.upcase)
+   end
 
    solr_field = map_field_to_solr(field)
-   solr_operator = map_operator_to_solr(operator, query)
-
-   query_parts << solr_operator % { field: solr_field, query: query }
+   
+   Rails.logger.debug "Advanced Search - Field: #{field}, Operator: #{operator}, Query: #{query}"
+   Rails.logger.debug "Advanced Search - Mapped Solr Field: #{solr_field}"
+   
+   # Handle "any" field specially - search across all fields
+   if field == "any" || field.to_s.downcase == "any"
+     # Define all searchable fields
+     all_fields = [
+       "title_tesim",
+       "creator_tesim",
+       "contributor_tesim",
+       "description_tesim",
+       "keyword_tesim",
+       "publisher_tesim",
+       "subject_tesim",
+       "identifier_tesim",
+       "date_created_tesim"
+     ]
+     
+     Rails.logger.debug "Advanced Search - Using ANY field, searching across: #{all_fields.join(', ')}"
+     
+     # Build query for each field and combine with OR
+     field_queries = all_fields.map do |field_name|
+       query_part = map_operator_to_solr(operator, query, field_name, true)
+       Rails.logger.debug "Advanced Search - Field #{field_name} query: #{query_part}"
+       query_part
+     end
+     combined = "(#{field_queries.join(' OR ')})"
+     Rails.logger.debug "Advanced Search - Combined ANY query: #{combined}"
+     query_parts << combined
+   else
+     # Single field search
+     single_query = map_operator_to_solr(operator, query, solr_field, false)
+     Rails.logger.debug "Advanced Search - Single field query: #{single_query}"
+     query_parts << single_query
+   end
    end
 
    # Join query parts using the provided logic (AND, OR, NOT)
@@ -602,16 +855,84 @@ def map_field_to_solr(field)
    field_mappings[field] || "all_text_timv" # Default to "Any Field"
 end
 
-def map_operator_to_solr(operator, query)
+def map_operator_to_solr(operator, query, field, is_any_field = false)
+   # Escape special Solr characters except wildcards for certain operators
+   def escape_solr_query(str, allow_wildcards = false)
+     if allow_wildcards
+       # Escape everything except * and ?
+       str.gsub(/([+\-&|!(){}\[\]^"~:\\\/])/) { |match| "\\#{match}" }
+     else
+       # Escape all special characters including wildcards
+       str.gsub(/([+\-&|!(){}\[\]^"~*?:\\\/])/) { |match| "\\#{match}" }
+     end
+   end
+   
    case operator
    when "contains"
-   "%{field}:*%{query}*"
-   when "starts_with"
-   "%{field}:%{query}*"
-   when "equals"
-   "%{field}:%{query}"
+     # For "any" field with multiple words, use simpler OR logic (like simple search)
+     if is_any_field
+       words = query.strip.split(/\s+/)
+       if words.length > 1
+         # For any field: each word can appear in any field (more permissive)
+         escaped_query = words.map { |w| escape_solr_query(w, true) }.join(' ')
+         "#{field}:(#{escaped_query})"
+       else
+         escaped_query = escape_solr_query(query, true)
+         "#{field}:*#{escaped_query}*"
+       end
+     else
+       # For specific fields: all words must appear in that field
+       words = query.strip.split(/\s+/)
+       if words.length > 1
+         word_queries = words.map do |word|
+           escaped_word = escape_solr_query(word, true)
+           "#{field}:*#{escaped_word}*"
+         end
+         "(#{word_queries.join(' AND ')})"
+       else
+         escaped_query = escape_solr_query(query, true)
+         "#{field}:*#{escaped_query}*"
+       end
+     end
+     
+   when "exact", "equals"
+     # Exact phrase match - use quotes for phrase matching (case-insensitive)
+     clean_query = query.gsub('"', '')
+     escaped_query = escape_solr_query(clean_query, false)
+     "#{field}:\"#{escaped_query}\""
+        when "starts_with"
+      # Starts with - must match at beginning of field (no leading wildcard)
+      # Use prefix query on string (_sim) fields where available for accurate results
+      
+      # Map of fields that have string (_sim) versions suitable for prefix search
+      sim_field_map = {
+        'title_tesim' => 'title_sim',
+        'creator_tesim' => 'creator_sim',
+        'contributor_tesim' => 'contributor_sim',
+        'keyword_tesim' => 'keyword_sim',
+        'publisher_tesim' => 'publisher_sim',
+        'subject_tesim' => 'subject_sim',
+        'language_tesim' => 'language_sim',
+        'genre_tesim' => 'genre_sim',
+        'resource_type_tesim' => 'resource_type_sim'
+      }
+      
+      # Use the _sim field if available, otherwise fall back to the provided field
+      search_field = sim_field_map[field] || field
+      
+      # Only escape spaces if we switched to a _sim field
+      if search_field != field
+        escaped_query = escape_solr_query(query, false).gsub(' ', '\\ ')
+      else
+        escaped_query = escape_solr_query(query, false)
+      end
+      
+      "#{search_field}:#{escaped_query}*"
+     
    else
-   "%{field}:*%{query}*" # Default to "contains"
+     # Default to "contains"
+     escaped_query = escape_solr_query(query, true)
+     "#{field}:*#{escaped_query}*"
    end
 end
 
@@ -620,6 +941,9 @@ end
  
 
  configure_blacklight do |config|
+    # Use only the main index partial to prevent duplicate title/thumbnail rendering
+    # since we have moved them inside the main card design in _index_list_default.html.erb
+    config.index.partials = [:index]
    #config.view.gallery.partials = [:index_header, :index]
    config.view.masonry.partials = [:index]
    config.view.slideshow.partials = [:index]
@@ -627,7 +951,7 @@ end
 
    config.show.tile_source_field = :content_metadata_image_iiif_info_ssm
    config.show.partials.insert(1, :openseadragon)
-   config.search_builder_class = Hyrax::CatalogSearchBuilder
+   config.search_builder_class = SearchBuilder
 
    # Show gallery view
    #config.view.gallery.partials = [:index_header, :index]

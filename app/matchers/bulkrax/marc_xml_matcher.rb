@@ -101,6 +101,10 @@ module Bulkrax
       src.strip
     end
 
+    def parse_license(src)
+      src.strip
+    end
+
     private
 
     def artist_to_hash(src)

@@ -7,7 +7,7 @@
           <%= text_field_tag :q, current_search_parameters, class: "q form-control", id: "search-field-header", placeholder: "Search Entire Collection" %>
           
           <i class="fa fa-info-circle" data-toggle="tooltip" title="Please avoid using special characters (e.g., @, #, $, %, &, -, +, *)"
-            style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #6a6a6a8f; z-index: 100;font-size: large;"></i>
+            style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #6a6a6a8f; z-index: 100;font-size: medium;"></i>
         </div>
         <button type="submit" class="search-button" id="search-submit-header" data-toggle="tooltip" title="Search">
           <i class="fa fa-search"></i>
@@ -23,8 +23,18 @@
         <div class="q-line-static " id="dynamic-search-rows">
           <div class="row search-row">
             <div class="form-group" style="padding-right:15px; padding-left:15px ">
-              <label>Creation Date</label><br>
-              <canvas id="timeline-canvas" width="885" height="50" style="padding-right:5px; padding-left:0px "></canvas>
+              <div style="display: flex; align-items: center; margin-bottom: 5px;">
+                <label style="margin-bottom: 0;">Created Between</label>
+                <label class="switch" style="margin-left: 15px; margin-top: 8px;" data-toggle="tooltip" title="Enable/Disable Date Filter">
+                  <input type="checkbox" id="date-toggle" checked>
+                  <span class="slider round"></span>
+                </label>
+              </div>
+              <div class="timeline-wrapper" style="position: relative; width: 100%; margin-top: 20px; margin-bottom: 20px;">
+                <canvas id="timeline-canvas" height="50"></canvas>
+                <div id="start-year-label" class="year-label" style="position: absolute; top: -20px; transform: translateX(-50%); cursor: pointer; color: white; font-weight: bolder; font-size: 14px; white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,0.5); z-index: 10;"></div>
+                <div id="end-year-label" class="year-label" style="position: absolute; top: -20px; transform: translateX(-50%); cursor: pointer; color: white; font-weight: bolder; font-size: 14px; white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,0.5); z-index: 10;"></div>
+              </div>
             </div>
 
             <br><br>
@@ -46,7 +56,7 @@
               <select name="search_operator[]" class="form-control operator-dropdown">
                 <option value="contains">Contains</option>
                 <option value="starts_with">Starts With</option>
-                <option value="equal">Equals</option>
+                <option value="equal">Exact</option>
               </select>
             </div>
             <div class="col-sm-6">
@@ -56,13 +66,21 @@
         </div>
       </div>
 
-      <div class="form-group" >
-        <label  id="add-line"  class="btn clickable-add-option"><i class="fa fa-plus"></i> Add New Search</label>  
-        <label id="clear-all"
-              class="btn clickable-clear-option"
-              data-redirect-url="<%= main_app.search_catalog_path(f: { human_readable_type_sim: ["Collection"]}) %>">
-          <i class="fa fa-refresh"></i> Clear All
-        </label>
+      <div class="row">
+        <div class="col-sm-12">
+          <div class="form-group" >
+            <label  id="add-line"  class="btn clickable-add-option" data-toggle="tooltip" title="Add another search field"><i class="fa fa-plus"></i> Add New Search</label>  
+            <label id="clear-all"
+                  class="btn clickable-clear-option"
+                  data-toggle="tooltip" title="Clear all search criteria and reset the form"
+                  data-redirect-url="<%= main_app.search_catalog_path %>">
+              <i class="fa fa-refresh"></i> Clear All
+            </label>
+            <label class="btn clickable-add-option pull-right" data-toggle="modal" data-target="#searchHelpModal" style="padding-right: 0px;">
+              <i class="fa fa-info-circle"></i> Search Tips
+            </label>
+          </div>
+        </div>
       </div>
       
       <br>
@@ -97,13 +115,111 @@
     <label for="toggle-advanced-search" style="padding-bottom: 20px;">Discover more with</label>
     <button type="button" id="toggle-advanced-search"  class="btn clickable-label">Advanced Search</button>
   </div>
+
+  <!-- Search Help Modal -->
+  <div class="modal fade" id="searchHelpModal" tabindex="-1" role="dialog" aria-labelledby="searchHelpModalLabel">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+          <h4 class="modal-title" id="searchHelpModalLabel">Advanced Search Tips</h4>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-warning">
+            <strong><i class="fa fa-exclamation-triangle"></i> Special Characters</strong>
+            <p>Please avoid using special characters such as <code>, . ; : - * ! " £ $ % ^ & ( | \ @ { [ ) } ] / ? + = ¬ `</code>.</p>
+            <ul>
+              <li>Instead of <code>Davitt, Cahir</code>, search for <strong>Davitt Cahir</strong>.</li>
+              <li>Instead of <code>Davitt, Cahir, Donor</code>, search for <strong>Davitt Cahir Donor</strong>.</li>
+            </ul>
+          </div>
+
+          <hr>
+
+          <h4><i class="fa fa-info-circle"></i> Search Operators</h4>
+          
+          <div class="panel panel-default">
+            <div class="panel-heading"><strong>Contains</strong></div>
+            <div class="panel-body">
+              <p>The <strong>Contains</strong> operator searches for <em>all</em> the words you enter, in any order, within the specified field.</p>
+              <p><em>Example:</em> Searching for <strong>Michael Davitt</strong> will find records containing both "Michael" AND "Davitt" anywhere in the field.</p>
+            </div>
+          </div>
+
+          <div class="panel panel-default">
+            <div class="panel-heading"><strong>Starts With</strong></div>
+            <div class="panel-body">
+              <p>The <strong>Starts With</strong> operator matches records where the field begins with your search term.</p>
+              <p><strong>Important Notes:</strong></p>
+              <ul>
+                <li>"Starts With" searches are <strong>Case Sensitive</strong>.</li>
+                <li>The following fields are not optimized for prefix searching; as a result, their behavior may resemble that of the “Contains” operator:<ul>
+                    <li>Abstract</li>
+                    <li>Copyright Note</li>
+                    <li>DOI</li>
+                    <li>Shelf Mark/Reference Number</li>
+                  </ul>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="panel panel-default">
+            <div class="panel-heading"><strong>Exact</strong></div>
+            <div class="panel-body">
+              <p>The <strong>Exact</strong> operator searches for the precise phrase you enter, in that exact order.</p>
+              <p><em>Example:</em> Searching for <strong>"Michael Davitt"</strong> will match records containing that exact phrase, but will <em>not</em> match "Davitt, Michael".</p>
+            </div>
+          </div>
+
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
 <% end %>
 
+<!-- jQuery UI for Autocomplete -->
+<link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+<script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
 
 <script>
 document.addEventListener("turbolinks:load", function () {
 
       $('#search-field-header').removeAttr('value');
+      
+      // Add Enter key support for search inputs
+      document.addEventListener('keypress', function(e) {
+        // Check if Enter key was pressed
+        if (e.key === 'Enter' || e.keyCode === 13) {
+          // Check if the target is a search input field
+          if (e.target.classList.contains('q') || e.target.id === 'search-field-header') {
+            e.preventDefault();
+            
+            const advancedPanel = document.querySelector(".advanced-search-panel");
+            const isAdvancedVisible = advancedPanel && advancedPanel.style.display !== 'none';
+            
+            if (isAdvancedVisible) {
+              // Trigger Advanced Search button click
+              const advSearchButton = document.getElementById('search-button');
+              if (advSearchButton) {
+                advSearchButton.click();
+              }
+            } else {
+              // Trigger Simple Search button click
+              const simpleSearchButton = document.getElementById('search-submit-header');
+              if (simpleSearchButton) {
+                simpleSearchButton.click();
+              } else {
+                document.getElementById('search-form-header').submit();
+              }
+            }
+          }
+        }
+      });
+      
       //Placeholder Animation
       const searchField = document.getElementById("search-field-header");
       
@@ -123,6 +239,9 @@ document.addEventListener("turbolinks:load", function () {
       //Search Info Tooltip
       $('[data-toggle="tooltip"]').tooltip();
 
+      // Move Modal to Body to prevent z-index issues
+      $('#searchHelpModal').appendTo("body");
+
       //Toggle the Advance Search Option
       const advancedPanel = document.querySelector(".advanced-search-panel");
       const toggleAdvancedSearch = document.getElementById("toggle-advanced-search");
@@ -130,11 +249,41 @@ document.addEventListener("turbolinks:load", function () {
       const simplePanel = document.querySelector(".simple-search-panel");
       const toggleSimpleSearch = document.getElementById("toggle-simple-search");
       
+      // Function to clear advanced search state from localStorage
+      function clearAdvancedSearchState() {
+          localStorage.removeItem("savedSearchFields");
+          localStorage.removeItem("advancedPanelState");
+          localStorage.removeItem("savedTimeRange");
+      }
+
+      // Clear advanced search state when Simple Search button is clicked
+      const simpleSearchButton = document.getElementById("search-submit-header");
+      if (simpleSearchButton) {
+          simpleSearchButton.addEventListener("click", clearAdvancedSearchState);
+      }
+
+      // Clear advanced search state when Enter is pressed in Simple Search input
+      const simpleSearchInput = document.getElementById("search-field-header");
+      if (simpleSearchInput) {
+          simpleSearchInput.addEventListener("keypress", function(e) {
+              if (e.key === 'Enter' || e.keyCode === 13) {
+                  clearAdvancedSearchState();
+              }
+          });
+      }
+      
 
       toggleAdvancedSearch.addEventListener("click", function() {
           $('#advance-search-option').hide();
           simplePanel.style.display = "none";
           advancedPanel.style.display = 'block';
+          
+          // Ensure timeline is correctly sized and drawn when panel is opened
+          setTimeout(() => {
+              syncCanvasSize();
+              drawSlider();
+              updateHTMLLabels();
+          }, 10);
       });
 
       toggleSimpleSearch.addEventListener("click", function() {
@@ -175,7 +324,7 @@ document.addEventListener("turbolinks:load", function () {
             <select name="search_operator[]" class="form-control operator-dropdown">
               <option value="contains">Contains</option>
               <option value="starts_with">Starts With</option>
-              <option value="equal">Equals</option>
+              <option value="equal">Exact</option>
             </select>
           </div>
           <div class="col-sm-3">
@@ -184,7 +333,7 @@ document.addEventListener("turbolinks:load", function () {
           </div>
           
         <div class="col-sm-1">
-            <button type="button" class="btn btn-clear-line" style="color: #fff; background-color: #ff76762b; border: 1px solid #ff9393;">
+            <button type="button" class="btn btn-clear-line" style="color: #fff; background-color: #ff76762b; border: 1px solid #ff9393;" data-toggle="tooltip" title="Remove this row">
               <i class="fa fa-trash-o" style="font-size:20px;"></i>
             </button>
           </div>
@@ -200,6 +349,8 @@ document.addEventListener("turbolinks:load", function () {
             const newLineHTML = `<div class="query-line" id="dynamic-search-rows">` + addNewLineHTML + `</div>`;
             dynamicContainer.insertAdjacentHTML("beforeend", newLineHTML);
             addCount++;
+            // Initialize tooltips for new elements
+            $('[data-toggle="tooltip"]').tooltip();
           } else {
             alert("You can only add up to 10 search lines.");
           }
@@ -228,30 +379,94 @@ document.addEventListener("turbolinks:load", function () {
 
       const minYear = -2500;
       const maxYear = new Date().getFullYear();
-      const initialStartYear = -1153;
-      const initialEndYear = 1147;
+      console.log('Date range slider - Current year (maxYear):', maxYear);
+      const initialStartYear = 1150;
+      const initialEndYear = 1950;
 
-      // Initialize pointers at the middle range
+      // Non-linear scale parameters
+      // This gives more precision to recent years while maintaining full historical range
+      const zoomPoint = 1800; // Year where we start expanding precision
+      const compressionFactor = 0.15; // How much to compress older years (0-1, lower = more compression)
+      const expansionFactor = 0.65; // How much of the slider to use for recent years (1800+)
+
+      // Get the actual internal width of the canvas
+      function getCanvasWidth() {
+          return canvas.width || 885;
+      }
+
+      // Convert year to slider position (non-linear)
+      function yearToPosition(year) {
+          const canvasWidth = getCanvasWidth();
+          const totalRange = maxYear - minYear;
+          const normalizedYear = (year - minYear) / totalRange; // 0 to 1
+          
+          if (year <= zoomPoint) {
+              // Older years: use compressed scale with power function
+              const zoomPointNormalized = (zoomPoint - minYear) / totalRange;
+              const yearRatio = normalizedYear / zoomPointNormalized; // 0 to 1 for older years
+              // Use power function to compress older years
+              const compressedRatio = Math.pow(yearRatio, 1.5); // Adjust exponent for more/less compression
+              return compressedRatio * zoomPointNormalized * (1 - expansionFactor) * canvasWidth;
+          } else {
+              // Recent years: use expanded linear scale
+              const zoomPointNormalized = (zoomPoint - minYear) / totalRange;
+              const recentRange = 1 - zoomPointNormalized;
+              const yearRatio = (normalizedYear - zoomPointNormalized) / recentRange; // 0 to 1 for recent years
+              const startPosition = zoomPointNormalized * (1 - expansionFactor) * canvasWidth;
+              const expandedRange = expansionFactor * canvasWidth;
+              return startPosition + yearRatio * expandedRange;
+          }
+      }
+
+      // Convert slider position to year (inverse of yearToPosition)
+      function positionToYear(position) {
+          const canvasWidth = getCanvasWidth();
+          const totalRange = maxYear - minYear;
+          const zoomPointNormalized = (zoomPoint - minYear) / totalRange;
+          const oldYearsEndPosition = zoomPointNormalized * (1 - expansionFactor) * canvasWidth;
+          
+          if (position <= oldYearsEndPosition) {
+              // Older years: reverse the compression
+              const compressedRatio = position / oldYearsEndPosition;
+              const yearRatio = Math.pow(compressedRatio, 1 / 1.5); // Inverse of power function
+              const normalizedYear = yearRatio * zoomPointNormalized;
+              return Math.round(normalizedYear * totalRange + minYear);
+          } else {
+              // Recent years: reverse the expansion
+              const startPosition = oldYearsEndPosition;
+              const expandedRange = expansionFactor * canvasWidth;
+              const yearRatio = (position - startPosition) / expandedRange;
+              const recentRange = 1 - zoomPointNormalized;
+              const normalizedYear = zoomPointNormalized + yearRatio * recentRange;
+              const calculatedYear = Math.round(normalizedYear * totalRange + minYear);
+              // Ensure we never exceed maxYear
+              return Math.min(calculatedYear, maxYear);
+          }
+      }
+
+      // Source of truth for years
+      let currentStartYear = initialStartYear;
+      let currentEndYear = initialEndYear;
+
+      // Initialize pointers
       const startPointer = {
-          x: ((initialStartYear - minYear) / (maxYear - minYear)) * canvas.width,
+          x: 0,
           y: 25,
-          label: initialStartYear < 0 ? Math.abs(initialStartYear) + " BCE" : initialStartYear+ " CE",
+          label: ""
       };
     
       const endPointer = {
-          x: ((initialEndYear - minYear) / (maxYear - minYear)) * canvas.width,
+          x: 0,
           y: 25,
-          label: initialEndYear < 0 ? Math.abs(initialEndYear) + " BCE" : initialEndYear + " CE",
+          label: ""
       };
 
+      function updatePointersFromYears() {
+          startPointer.x = yearToPosition(currentStartYear);
+          endPointer.x = yearToPosition(currentEndYear);
+      }
+
       function updateYearLabels() {
-          const startPercent = startPointer.x / canvas.width;
-          const endPercent = endPointer.x / canvas.width;
-
-          // Calculate the start and end year based on the pointer positions
-          const startYear = Math.round(startPercent * (maxYear - minYear) + minYear);
-          const endYear = Math.round(endPercent * (maxYear - minYear) + minYear);
-
           // Function to format the year as BCE or CE
           function formatYear(year) {
               if (year <= 0) {
@@ -262,88 +477,199 @@ document.addEventListener("turbolinks:load", function () {
           }
 
           // Update the labels to show the formatted years
-          startPointer.label = formatYear(startYear);
-          endPointer.label = formatYear(endYear);
+          startPointer.label = formatYear(currentStartYear);
+          endPointer.label = formatYear(currentEndYear);
       }
 
 
       function drawSlider() {
+          const isEnabled = document.getElementById('date-toggle').checked;
+          
+          // Ensure internal dimensions match rendered dimensions for 1:1 mapping
+          const rect = canvas.getBoundingClientRect();
+          if (rect.width > 0 && canvas.width !== Math.round(rect.width)) {
+              canvas.width = Math.round(rect.width);
+              canvas.height = 50;
+              updatePointersFromYears();
+          }
+
           ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-          // Draw timeline background for the entire slider
-          const radius = 6; // Adjust this value for more or less rounding
+          if (!isEnabled) {
+              ctx.globalAlpha = 0.4;
+          } else {
+              ctx.globalAlpha = 1.0;
+          }
 
-          ctx.fillStyle = "#fff"; // Background color outside the range
+          // Draw timeline background for the entire slider
+          const trackHeight = 12;
+          const trackY = startPointer.y - 5;
+          const radius = 6;
+
+          ctx.fillStyle = "#f0f0f0"; // Light gray background outside the range
           
-          // Draw rounded rectangle manually
+          // Draw rounded track background
           ctx.beginPath();
-          ctx.moveTo(radius, startPointer.y - 5); // Start from the left rounded corner
-          ctx.lineTo(canvas.width - radius, startPointer.y - 5); // Top edge
-          ctx.arc(canvas.width - radius, startPointer.y + 1, radius, Math.PI * 1.5, Math.PI * 0.5, false); // Right rounded edge
-          ctx.lineTo(radius, startPointer.y + 7); // Bottom edge
-          ctx.arc(radius, startPointer.y + 1, radius, Math.PI * 0.5, Math.PI * 1.5, false); // Left rounded edge
+          ctx.moveTo(radius, trackY);
+          ctx.lineTo(canvas.width - radius, trackY);
+          ctx.arc(canvas.width - radius, trackY + radius, radius, Math.PI * 1.5, Math.PI * 0.5, false);
+          ctx.lineTo(radius, trackY + trackHeight);
+          ctx.arc(radius, trackY + radius, radius, Math.PI * 0.5, Math.PI * 1.5, false);
           ctx.closePath();
           ctx.fill();
           
 
-          // Draw timeline background for the selected range
-          ctx.fillStyle = "#7ac1f5"; // Highlight color for the range
-          ctx.fillRect(startPointer.x, startPointer.y - 5, endPointer.x - startPointer.x, 12);
+          // Draw timeline background for the selected range with gradient
+          const gradient = ctx.createLinearGradient(startPointer.x, 0, endPointer.x, 0);
+          gradient.addColorStop(0, "#667eea");    // Purple
+          gradient.addColorStop(0.5, "#4facfe");  // Blue
+          gradient.addColorStop(1, "#00f2fe");    // Cyan
+          ctx.fillStyle = gradient;
+          ctx.beginPath();
+          ctx.rect(startPointer.x, trackY, endPointer.x - startPointer.x, trackHeight);
+          ctx.fill();
 
-          // Draw start pointer
-          ctx.fillStyle = "#1074b7";
+          // Draw start pointer with gradient
+          const startGradient = ctx.createRadialGradient(startPointer.x, startPointer.y, 0, startPointer.x, startPointer.y, 10);
+          startGradient.addColorStop(0, "#667eea");
+          startGradient.addColorStop(1, "#764ba2");
+          ctx.fillStyle = startGradient;
           ctx.beginPath();
           ctx.arc(startPointer.x, startPointer.y, 10, 0, Math.PI * 2);
           ctx.fill();
+          
+          // Add white border to pointer
+          ctx.strokeStyle = "#fff";
+          ctx.lineWidth = 2;
+          ctx.stroke();
 
-          // Draw end pointer
+          // Draw end pointer with gradient
+          const endGradient = ctx.createRadialGradient(endPointer.x, endPointer.y, 0, endPointer.x, endPointer.y, 10);
+          endGradient.addColorStop(0, "#00f2fe");  // Cyan
+          endGradient.addColorStop(1, "#4facfe");  // Blue
+          ctx.fillStyle = endGradient;
           ctx.beginPath();
           ctx.arc(endPointer.x, endPointer.y, 10, 0, Math.PI * 2);
           ctx.fill();
+          
+          // Add white border to pointer
+          ctx.strokeStyle = "#fff";
+          ctx.lineWidth = 2;
+          ctx.stroke();
 
-          // Draw labels
-          ctx.fillStyle = "#fff";
-          ctx.font = "bolder 14px Arial";
+          // Draw labels - REMOVED from canvas, now using HTML
+      }
 
-          const textPadding = 5; // Padding to prevent edge clipping
-          const minLabelSpacing = 20; // Minimum distance between labels
+      function updateHTMLLabels() {
+          const startLabel = document.getElementById('start-year-label');
+          const endLabel = document.getElementById('end-year-label');
+          if (!startLabel || !endLabel) return;
 
-          // Measure text widths
-          const textWidthStart = ctx.measureText(startPointer.label).width;
-          const textWidthEnd = ctx.measureText(endPointer.label).width;
+          const renderedWidth = canvas.getBoundingClientRect().width;
+          if (renderedWidth <= 0) return;
+          
+          let startX = startPointer.x;
+          let endX = endPointer.x;
 
-          // Default positions
-          let startX = startPointer.x - textWidthStart / 2;
-          let endX = endPointer.x - textWidthEnd / 2;
+          startLabel.innerHTML = startPointer.label;
+          endLabel.innerHTML = endPointer.label;
 
-          // Prevent labels from going outside the div
-          if (startX < textPadding) startX = textPadding;
-          if (startX + textWidthStart > canvas.width - textPadding) startX = canvas.width - textWidthStart - textPadding;
+          // Boundary checks to prevent labels from going off-screen
+          const startWidth = startLabel.offsetWidth;
+          const endWidth = endLabel.offsetWidth;
+          const halfStart = startWidth / 2;
+          const halfEnd = endWidth / 2;
 
-          if (endX < textPadding) endX = textPadding;
-          if (endX + textWidthEnd > canvas.width - textPadding) endX = canvas.width - textWidthEnd - textPadding;
+          if (startX - halfStart < 0) startX = halfStart;
+          if (startX + halfStart > renderedWidth) startX = renderedWidth - halfStart;
 
-          // **Avoid Overlapping Labels**
-          if (endX < startX + textWidthStart + minLabelSpacing) {
-              let overlapAdjustment = (startX + textWidthStart + minLabelSpacing) - endX;
-              endX += overlapAdjustment / 2;
-              startX -= overlapAdjustment / 2;
+          if (endX - halfEnd < 0) endX = halfEnd;
+          if (endX + halfEnd > renderedWidth) endX = renderedWidth - halfEnd;
+
+          startLabel.style.left = startX + 'px';
+          endLabel.style.left = endX + 'px';
+
+          // Handle overlap
+          const startRect = startLabel.getBoundingClientRect();
+          const endRect = endLabel.getBoundingClientRect();
+          const minSpacing = 10;
+
+          if (startX + startRect.width/2 + minSpacing > endX - endRect.width/2) {
+              const overlap = (startX + startRect.width/2 + minSpacing) - (endX - endRect.width/2);
+              startLabel.style.left = (startX - overlap/2) + 'px';
+              endLabel.style.left = (endX + overlap/2) + 'px';
+          }
+      }
+
+      function makeLabelEditable(labelId, pointer) {
+          const label = document.getElementById(labelId);
+          if (!label || label.querySelector('input')) return;
+
+          const currentYear = (pointer === startPointer) ? currentStartYear : currentEndYear;
+          const yearNum = Math.abs(currentYear);
+          const suffix = currentYear <= 0 ? " BCE" : " CE";
+
+          const input = document.createElement('input');
+          input.type = 'text';
+          input.className = 'year-edit-input';
+          input.value = yearNum;
+
+          label.innerHTML = '';
+          label.appendChild(input);
+          input.focus();
+          input.select();
+
+          function saveEdit() {
+              let newYearNum = parseInt(input.value);
+              if (isNaN(newYearNum)) {
+                  newYearNum = yearNum;
+              }
+
+              // Apply the same BCE/CE logic
+              let newYear = (pointer === startPointer ? currentStartYear : currentEndYear) <= 0 ? -newYearNum : newYearNum;
+              
+              // Validate range
+              if (newYear < minYear) newYear = minYear;
+              if (newYear > maxYear) newYear = maxYear;
+
+              // Ensure pointers don't cross
+              if (pointer === startPointer) {
+                  if (newYear >= currentEndYear) newYear = currentEndYear - 1;
+                  currentStartYear = newYear;
+              } else {
+                  if (newYear <= currentStartYear) newYear = currentStartYear + 1;
+                  currentEndYear = newYear;
+              }
+
+              updatePointersFromYears();
+              updateYearLabels();
+              drawSlider();
+              updateHTMLLabels();
           }
 
-          // Draw text after adjustments
-          ctx.fillText(startPointer.label, startX, startPointer.y - 15);
-          ctx.fillText(endPointer.label, endX, endPointer.y - 15);
-
-
+          input.addEventListener('blur', saveEdit);
+          input.addEventListener('keypress', function(e) {
+              if (e.key === 'Enter') {
+                  input.blur();
+              }
+              // Only allow numbers
+              if (!/[0-9]/.test(e.key)) {
+                  e.preventDefault();
+              }
+          });
       }
+
+      document.getElementById('start-year-label').addEventListener('click', () => makeLabelEditable('start-year-label', startPointer));
+      document.getElementById('end-year-label').addEventListener('click', () => makeLabelEditable('end-year-label', endPointer));
 
 
       function dragPointer(e, pointer) {
           const rect = canvas.getBoundingClientRect();
           const minLeft = 0;
-          const maxLeft = canvas.width;
+          const maxLeft = getCanvasWidth();
 
           function onMouseMove(event) {
+              const rect = canvas.getBoundingClientRect();
               let newX = event.clientX - rect.left;
               newX = Math.min(Math.max(newX, minLeft), maxLeft);
 
@@ -352,16 +678,19 @@ document.addEventListener("turbolinks:load", function () {
                   if (newX >= endX) {
                       newX = endX - 1;
                   }
+                  currentStartYear = positionToYear(newX);
               } else {
                   const startX = startPointer.x;
                   if (newX <= startX) {
                       newX = startX + 1;
                   }
+                  currentEndYear = positionToYear(newX);
               }
 
-              pointer.x = newX;
+              updatePointersFromYears();
               updateYearLabels();
               drawSlider();
+              updateHTMLLabels();
           }
 
           function onMouseUp() {
@@ -374,8 +703,12 @@ document.addEventListener("turbolinks:load", function () {
       }
 
       canvas.addEventListener("mousedown", function(e) {
-          const distStart = Math.abs(e.clientX - canvas.getBoundingClientRect().left - startPointer.x);
-          const distEnd = Math.abs(e.clientX - canvas.getBoundingClientRect().left - endPointer.x);
+          if (!document.getElementById('date-toggle').checked) return;
+          const rect = canvas.getBoundingClientRect();
+          const mouseX = e.clientX - rect.left;
+          
+          const distStart = Math.abs(mouseX - startPointer.x);
+          const distEnd = Math.abs(mouseX - endPointer.x);
 
           if (distStart < distEnd) {
               dragPointer(e, startPointer);
@@ -384,9 +717,46 @@ document.addEventListener("turbolinks:load", function () {
           }
       });
 
+      // Sync canvas internal width with rendered width for proper scaling
+      function syncCanvasSize() {
+          const rect = canvas.getBoundingClientRect();
+          const renderedWidth = rect.width;
+          if (renderedWidth && renderedWidth > 0 && (canvas.width !== Math.round(renderedWidth) || canvas.height !== 50)) {
+              // Update canvas internal dimensions
+              canvas.width = Math.round(renderedWidth);
+              canvas.height = 50;
+              
+              // Recalculate pointer positions from years
+              updatePointersFromYears();
+          }
+      }
+
       // Initial setup
+      syncCanvasSize();
+      updatePointersFromYears();
       updateYearLabels();
       drawSlider();
+      updateHTMLLabels();
+
+      // Handle window resize
+      let resizeTimeout;
+      window.addEventListener('resize', function() {
+          clearTimeout(resizeTimeout);
+          resizeTimeout = setTimeout(function() {
+              syncCanvasSize();
+              drawSlider();
+              updateHTMLLabels();
+          }, 100);
+      });
+
+      // Redraw slider when toggle changes
+      const dateToggle = document.getElementById('date-toggle');
+      if (dateToggle) {
+          dateToggle.addEventListener('change', function() {
+              drawSlider();
+              updateHTMLLabels();
+          });
+      }
 
       const searchButton = document.getElementById('search-button');
       const rowsContainer = document.getElementById('dynamic-search-rows');
@@ -395,7 +765,13 @@ document.addEventListener("turbolinks:load", function () {
         const savedSearchFields = localStorage.getItem("savedSearchFields");
         const savedPanelState = localStorage.getItem("advancedPanelState");
         const savedTimeRange = localStorage.getItem("savedTimeRange");
+        const savedDateToggleState = localStorage.getItem("dateToggleState");
     
+        // Restore date toggle state
+        if (savedDateToggleState) {
+            document.getElementById('date-toggle').checked = (savedDateToggleState === "enabled");
+        }
+
         // Restore search fields values
         if (savedSearchFields) {
             const searchFieldsData = JSON.parse(savedSearchFields);
@@ -444,17 +820,16 @@ document.addEventListener("turbolinks:load", function () {
         // Restore time slider values
         if (savedTimeRange) {
             const [startYear, endYear] = JSON.parse(savedTimeRange);
-            startPointer.label = startYear;
-            endPointer.label = endYear;
     
-            // Update the pointers based on saved values
-            startPointer.x = ((startYear - minYear) / (maxYear - minYear)) * canvas.width;
-            endPointer.x = ((endYear - minYear) / (maxYear - minYear)) * canvas.width;
-    
-            // Update labels and redraw the slider
+            currentStartYear = startYear;
+            currentEndYear = endYear;
+
+            // Update pointers and labels
+            updatePointersFromYears();
             updateYearLabels();
-            drawSlider();
         }
+        drawSlider();
+        updateHTMLLabels();
     }
     
     // Function to extract the correct year value from the label
@@ -519,11 +894,12 @@ document.addEventListener("turbolinks:load", function () {
       localStorage.setItem("savedSearchFields", JSON.stringify(searchFieldsData));
   
       // Save time range values
-      const startPointerLabel= extractYearFromLabel(startPointer.label);
-      const endPointerLabel= extractYearFromLabel(endPointer.label);
-      const savedTimeRange = JSON.stringify([startPointerLabel, endPointerLabel]);
+      const savedTimeRange = JSON.stringify([currentStartYear, currentEndYear]);
       localStorage.setItem("savedTimeRange", savedTimeRange);
   
+      // Save date toggle state
+      localStorage.setItem("dateToggleState", document.getElementById('date-toggle').checked ? "enabled" : "disabled");
+
       // Save advanced panel state
       localStorage.setItem("advancedPanelState", advancedPanel.style.display === "block" ? "open" : "closed");
     }
@@ -541,45 +917,162 @@ document.addEventListener("turbolinks:load", function () {
           let operator = row.querySelector(".operator-dropdown").value;
           let query = row.querySelector(".q").value.trim();
   
-          // Apply correct formatting based on the operator
-          query = query.includes(' ') ? `"${query}"` : query;
-          if (operator === 'contains') {
-              query = `*${query}*`;
-          } else if (operator === 'starts_with') {
-              query = `${query}*`;
-          } else if (operator === 'equal') {
-              query = `"${query}"`;
-          }
-  
-          let queryPart = `(${field}:${query})`;
-  
-          // Special handling for combined facets
-          if (field === "contributor_tesim") {
-              queryPart = `(contributor_tesim:${query}) OR (creator_tesim:${query})`;
-          } else if (field === "keyword_tesim") {
-              queryPart = `(keyword_tesim:${query}) OR (subject_tesim:${query})`;
-          }
-  
-          // Append logic only from the second row onward
-          if (index > 0 && logic) {
-              combinedQuery += ` ${logic} `;
-          }
-  
-          combinedQuery += queryPart;
+          // Skip empty queries
+        if (!query) return;
+
+        // Apply correct formatting based on the operator
+        // Handle multi-word queries and operators properly
+        if (operator === 'contains') {
+            // For contains: we use a combined approach (term OR *term*)
+            // This allows stemming to work (via 'term') AND substring matching (via '*term*')
+            // query is processed per-word below
+        } else if (operator === 'starts_with') {
+            // For starts_with: do NOT add wildcard here, it's added later
+            // But we DO need to escape spaces for Solr string fields
+            query = query.replace(/ /g, '\\ ');
+        } else if (operator === 'equal') {
+            // For exact: always wrap in quotes
+            query = `"${query}"`;
+        }
+
+        // Helper to expand plural words (Safe S-Removal)
+        const expandPlurals = (word, fieldName) => {
+            // Logic: length > 3, ends in 's', but not 'ss'
+            if (word.length > 3 && word.toLowerCase().endsWith('s') && !word.toLowerCase().endsWith('ss')) {
+                const singular = word.slice(0, -1);
+                // Return expanded query: (field:word OR field:*word*) OR (field:singular OR field:*singular*)
+                return `((${fieldName}:${word} OR ${fieldName}:*${word}*) OR (${fieldName}:${singular} OR ${fieldName}:*${singular}*))`;
+            }
+            // Default: just standard term + wildcard
+            return `(${fieldName}:${word} OR ${fieldName}:*${word}*)`;
+        };
+
+        let queryPart;
+        
+        // Helper to get correct field name for starts_with
+        const getFieldForOperator = (fieldName, op) => {
+            if (op !== 'starts_with') return fieldName;
+            
+            // Map of fields that have string (_sim) versions suitable for prefix search
+            const simFieldMap = {
+                'title_tesim': 'title_sim',
+                'creator_tesim': 'creator_sim',
+                'contributor_tesim': 'contributor_sim',
+                'keyword_tesim': 'keyword_sim',
+                'publisher_tesim': 'publisher_sim',
+                'subject_tesim': 'subject_sim',
+                'language_tesim': 'language_sim',
+                'genre_tesim': 'genre_sim',
+                'resource_type_tesim': 'resource_type_sim'
+            };
+            
+            return simFieldMap[fieldName] || fieldName;
+        };
+
+        // Handle "any" field - search across all fields
+        if (field === 'any') {
+            const allFields = [
+                'abstract_tesim',
+                'contributor_tesim',
+                'creator_tesim',
+                'keyword_tesim',
+                'subject_tesim',
+                'publisher_tesim',
+                'identifier_tesim',
+                'title_tesim',
+                'copyright_note_tesim',
+                'digital_object_identifier_tesim'
+            ];
+            
+            if (operator === 'contains') {
+                // Split into words and search each word across all fields
+                const words = query.trim().split(/\s+/);
+                const wordQueries = words.map(word => {
+                    const fieldQueries = allFields.map(f => expandPlurals(word, f)).join(' OR ');
+                    return `(${fieldQueries})`;
+                });
+                queryPart = wordQueries.join(' AND ');
+            } else if (operator === 'starts_with') {
+                // For starts_with: use prefix query on _sim fields where available
+                const fieldQueries = allFields.map(f => {
+                    const searchField = getFieldForOperator(f, operator);
+                    // Only escape spaces if we switched to a _sim field
+                    const val = (searchField !== f) ? query.replace(/ /g, '\\ ') : query;
+                    return `${searchField}:${val}*`;
+                }).join(' OR ');
+                queryPart = `(${fieldQueries})`;
+            } else if (operator === 'equal') {
+                // For exact: use phrase query
+                const fieldQueries = allFields.map(f => `${f}:"${query}"`).join(' OR ');
+                queryPart = `(${fieldQueries})`;
+            }
+        }
+        // Special handling for combined facets
+        else if (field === "contributor_tesim") {
+            if (operator === 'contains') {
+                const words = query.replace(/\*/g, '').trim().split(/\s+/);
+                const wordQueries = words.map(word => {
+                    const contQuery = expandPlurals(word, 'contributor_tesim');
+                    const creatQuery = expandPlurals(word, 'creator_tesim');
+                    return `(${contQuery} OR ${creatQuery})`;
+                });
+                queryPart = wordQueries.join(' AND ');
+            } else if (operator === 'starts_with') {
+                queryPart = `(contributor_sim:${query}* OR creator_sim:${query}*)`;
+            } else {
+                queryPart = `(contributor_tesim:${query} OR creator_tesim:${query})`;
+            }
+        } else if (field === "keyword_tesim") {
+            if (operator === 'contains') {
+                const words = query.replace(/\*/g, '').trim().split(/\s+/);
+                const wordQueries = words.map(word => {
+                    const keyQuery = expandPlurals(word, 'keyword_tesim');
+                    const subQuery = expandPlurals(word, 'subject_tesim');
+                    return `(${keyQuery} OR ${subQuery})`;
+                });
+                queryPart = wordQueries.join(' AND ');
+            } else if (operator === 'starts_with') {
+                queryPart = `(keyword_sim:${query}* OR subject_sim:${query}*)`;
+            } else {
+                queryPart = `(keyword_tesim:${query} OR subject_tesim:${query})`;
+            }
+        } else {
+            // Single specific field
+            if (operator === 'contains') {
+                const words = query.replace(/\*/g, '').trim().split(/\s+/);
+                const wordQueries = words.map(word => expandPlurals(word, field));
+                queryPart = `(${wordQueries.join(' AND ')})`;
+            } else {
+                const searchField = getFieldForOperator(field, operator);
+                const val = operator === 'starts_with' ? `${query}*` : query;
+                queryPart = `(${searchField}:${val})`;
+            }
+        }
+
+        // Append logic only from the second row onward
+        if (index > 0 && logic) {
+            combinedQuery += ` ${logic} `;
+        }
+
+        combinedQuery += queryPart;
       });
   
-      // Fetch time range values from the timeline slider
-      const startYear = extractYearFromLabel(startPointer.label);
-      const endYear = extractYearFromLabel(endPointer.label);
-  
-      if (combinedQuery) {
-          combinedQuery += " AND ";
+      // Fetch time range values from the timeline slider if enabled
+      const dateEnabled = document.getElementById('date-toggle').checked;
+      if (dateEnabled) {
+          const startYear = currentStartYear;
+          const endYear = currentEndYear;
+      
+          if (combinedQuery) {
+              combinedQuery += " AND ";
+          }
+      
+          // Append time range filter to query (include records without dates)
+          combinedQuery += `(date_created_tesim:[${startYear} TO ${endYear}] OR (*:* NOT date_created_tesim:*))`;
       }
   
-      // Append time range filter to query
-      combinedQuery += `(date_created_tesim:[${startYear}TO${endYear}])`;
   
-      return new URLSearchParams({ q: combinedQuery }).toString();
+      return new URLSearchParams({ q: combinedQuery, advanced_search: 'true' }).toString();
   }
   
   
@@ -648,6 +1141,10 @@ document.addEventListener("turbolinks:load", function () {
         localStorage.removeItem("savedSearchFields");
         localStorage.removeItem("savedTimeRange");
         localStorage.removeItem("advancedPanelState");
+        localStorage.removeItem("dateToggleState");
+
+        // Reset date toggle to enabled
+        document.getElementById('date-toggle').checked = true;
 
         // Optionally clear the search fields (if needed)
         document.querySelectorAll(".search-row").forEach((row) => {
@@ -657,20 +1154,19 @@ document.addEventListener("turbolinks:load", function () {
             row.querySelector(".q").value = ''; // reset search input
         });
 
-        // Clear the time slider to the default state
-        startPointer.label = initialStartYear;
-        endPointer.label = initialEndYear;
-        startPointer.x = ((initialStartYear - minYear) / (maxYear - minYear)) * canvas.width;
-        endPointer.x = ((initialEndYear - minYear) / (maxYear - minYear)) * canvas.width;
+        // Clear the time slider to the default state using non-linear scale
+        startPointer.x = yearToPosition(initialStartYear);
+        endPointer.x = yearToPosition(initialEndYear);
         updateYearLabels();
         drawSlider();
+        updateHTMLLabels();
 
         // Reset the panel to the simple view
         advancedPanel.style.display = 'none';
         simplePanel.style.display = 'block';
         document.getElementById("advance-search-option").style.display = 'block';
 
-        // Refresh the page to reset everything
+        // Redirect to catalog root to show all records
         const url = clearAllButton.getAttribute("data-redirect-url");
         if (url) {
           window.location.href = url;
@@ -819,9 +1315,94 @@ document.addEventListener("turbolinks:load", function () {
 
   #timeline-canvas {
     width: 100%;         
-    height: auto;        
+    height: 50px; /* Fixed height to eliminate distortion */
     display: block;      
     max-width: 100%;    
-    padding-right: 15px;
-    padding-left: 15px;
+  }
+
+  .timeline-wrapper {
+    /* Rely on parent padding for alignment */
+  }
+
+  /* Modern Toggle Switch */
+  .switch {
+    position: relative;
+    display: inline-block;
+    width: 34px;
+    height: 18px;
+  }
+
+  .switch input { 
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    -webkit-transition: .4s;
+    transition: .4s;
+  }
+
+  .slider:before {
+    position: absolute;
+    content: "";
+    height: 14px;
+    width: 14px;
+    left: 2px;
+    bottom: 2px;
+    background-color: white;
+    -webkit-transition: .4s;
+    transition: .4s;
+  }
+
+  input:checked + .slider {
+    background-color: #2196F3;
+  }
+
+  input:focus + .slider {
+    box-shadow: 0 0 1px #2196F3;
+  }
+
+  input:checked + .slider:before {
+    -webkit-transform: translateX(16px);
+    -ms-transform: translateX(16px);
+    transform: translateX(16px);
+  }
+
+  /* Rounded sliders */
+  .slider.round {
+    border-radius: 18px;
+  }
+
+  .slider.round:before {
+    border-radius: 50%;
+  }
+
+  .year-label:hover {
+    text-decoration: underline;
+    color: #ffeb3b !important; /* Slight yellow on hover to indicate clickability */
+  }
+
+  .year-edit-input {
+    width: 60px;
+    height: 22px;
+    background: white;
+    border: 1px solid #4facfe;
+    border-radius: 4px;
+    color: #333;
+    font-weight: bold;
+    text-align: center;
+    font-size: 13px;
+    padding: 0;
+    margin: 0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    outline: none;
+  }
 </style>

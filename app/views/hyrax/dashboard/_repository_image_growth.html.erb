@@ -1,0 +1,76 @@
+<div class="panel-heading">
+  <div class="row">
+    <div class="col-sm-7">
+      <h3 class="panel-title">Image/File Growth</h3>
+      <div class="text-muted">Growth of images/files over time</div>
+    </div>
+    <div class="col-sm-5 text-right">
+      <select id="repository-image-growth-period" class="form-control input-sm" style="display: inline-block; width: auto; border-radius: 4px; border: 1px solid #ccc; padding: 2px 10px;">
+        <option value="months:3">Past 3 Months</option>
+        <option value="months:6" selected>Past 6 Months</option>
+        <option value="months:12">Past 1 Year</option>
+        <option value="years:3">Past 3 Years</option>
+        <option value="years:6">Past 6 Years</option>
+        <option value="years:10">Past 10 Years</option>
+      </select>
+    </div>
+  </div>
+</div>
+<div class="panel-body text-center">
+  <div id="dashboard-image-growth" aria-hidden="true" style="height: 200px">
+    <div class="text-center" style="padding-top: 80px;">
+      <i class="fa fa-spinner fa-spin fa-2x"></i>
+      <p>Loading chart...</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  $(document).on('turbolinks:load', function() {
+    var imageGrowthChart;
+    
+    function loadGrowthData(rangeType, value) {
+      var $panel = $('#repository-image-growth-period').closest('.panel');
+      $panel.css('opacity', '0.5');
+      
+      $.ajax({
+        url: '/dashboard/repository_image_growth_data',
+        data: { range_type: rangeType, value: value },
+        success: function(data) {
+          $panel.css('opacity', '1');
+          $('#dashboard-image-growth').empty();
+          
+          if (data.length === 0) {
+            $('#dashboard-image-growth').html('<div style="padding-top: 80px;">No data available for this period.</div>');
+            return;
+          }
+
+          Morris.Bar({
+             element: 'dashboard-image-growth',
+             data: data,
+             xkey: 'y',
+             ykeys: ['a'],
+             labels: ['Files'],
+             resize: true,
+             hideHover: 'auto',
+             gridTextSize: '10px',
+             barColors: ['#3FBAE4'],
+             gridLineColor: '#E5E5E5'
+          });
+        },
+        error: function() {
+          $panel.css('opacity', '1');
+          $('#dashboard-image-growth').html('<div style="padding-top: 80px; color: red;">Failed to load data.</div>');
+        }
+      });
+    }
+
+    // Initial load
+    loadGrowthData('months', 6);
+    
+    $('#repository-image-growth-period').on('change', function() {
+      var parts = $(this).val().split(':');
+      loadGrowthData(parts[0], parts[1]);
+    });
+  });
+</script>

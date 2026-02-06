@@ -9,15 +9,167 @@
 <%= presenter.attribute_to_html(:creator, render_as: :faceted, html_dl: true) %>
 <%= presenter.attribute_to_html(:contributor, render_as: :faceted, html_dl: true) %>
 <%= presenter.attribute_to_html(:doi, html_dl: true) %>
+
+
+
+<%# Custom license display: smart lookup and display logic %>
+<% if presenter.license.present? %>
+  
+   <dt>Licence</dt>
+    <dd>
+      <ul class="tabular">
+        <% presenter.license.each do |license_value| %>
+          <li class="attribute attribute-license">
+            <% 
+              # Smart lookup: check if this is a term or ID
+              term_match = nil
+              id_match = nil
+              
+              licenses_file = Rails.root.join('config', 'authorities', 'licenses.yml')
+              if File.exist?(licenses_file)
+                licenses_data = YAML.load_file(licenses_file)
+                licenses_data['terms'].each do |term_data|
+                  # Check if this is a term match
+                  if term_data['term'] == license_value
+                    term_match = term_data
+                    break
+                  end
+                  # Check if this is an ID match
+                  if term_data['id'] == license_value
+                    id_match = term_data
+                    break
+                  end
+                end
+              end
+              
+              # Determine what to display
+              if term_match
+                # This is a term, so we have an ID to work with
+                id = term_match['id']
+                if id.start_with?('http://', 'https://')
+                  # URL ID: show term as clickable link
+                  display_text = term_match['term']
+                  link_url = id
+                else
+                  # Text ID: show the ID text directly
+                  display_text = id
+                  link_url = nil
+                end
+              elsif id_match
+                # This is already an ID
+                if license_value.start_with?('http://', 'https://')
+                  # URL ID: show term as clickable link
+                  display_text = id_match['term']
+                  link_url = license_value
+                else
+                  # Text ID: show directly
+                  display_text = license_value
+                  link_url = nil
+                end
+              else
+                # No match found, show as is
+                display_text = license_value
+                link_url = nil
+              end
+            %>
+            
+            <% if link_url %>
+              <%= link_to display_text, link_url, target: '_blank' %>
+            <% else %>
+              <%= display_text %>
+            <% end %>
+          </li>
+        <% end %>
+      </ul>
+    </dd>
+  
+<% end %>
+
+<%= presenter.attribute_to_html(:copyright_note, html_dl: true) %>
+
+<%= presenter.attribute_to_html(:copyright_status, html_dl: true) %>
+
+<%# Custom rights statement display: smart lookup and display logic %>
+<% if presenter.rights_statement.present? %>
+  
+    <dt><%= t('hyrax.base.show.rights_statement') %></dt>
+    <dd>
+      <ul class="tabular">
+        <% presenter.rights_statement.each do |rights_value| %>
+          <li class="attribute attribute-rights_statement">
+            <% 
+              # Smart lookup: check if this is a term or ID
+              term_match = nil
+              id_match = nil
+              
+              rights_file = Rails.root.join('config', 'authorities', 'rights_statements.yml')
+              if File.exist?(rights_file)
+                rights_data = YAML.load_file(rights_file)
+                rights_data['terms'].each do |term_data|
+                  # Check if this is a term match
+                  if term_data['term'] == rights_value
+                    term_match = term_data
+                    break
+                  end
+                  # Check if this is an ID match
+                  if term_data['id'] == rights_value
+                    id_match = term_data
+                    break
+                  end
+                end
+              end
+              
+              # Determine what to display
+              if term_match
+                # This is a term, so we have an ID to work with
+                id = term_match['id']
+                if id.start_with?('http://', 'https://')
+                  # URL ID: show term as clickable link
+                  display_text = term_match['term']
+                  link_url = id
+                else
+                  # Text ID: show the ID text directly
+                  display_text = id
+                  link_url = nil
+                end
+              elsif id_match
+                # This is already an ID
+                if rights_value.start_with?('http://', 'https://')
+                  # URL ID: show term as clickable link
+                  display_text = id_match['term']
+                  link_url = rights_value
+                else
+                  # Text ID: show directly
+                  display_text = rights_value
+                  link_url = nil
+                end
+              else
+                # No match found, show as is
+                display_text = rights_value
+                link_url = nil
+              end
+            %>
+            
+            <% if link_url %>
+              <%= link_to display_text, link_url, target: '_blank' %>
+            <% else %>
+              <%= display_text %>
+            <% end %>
+          </li>
+        <% end %>
+      </ul>
+    </dd>
+  
+<% end %>
+
 <!-- Marker just before the button -->
 <span id="TCDdots"></span>
 
 <!-- The Collapsible metadata -->
 <span id="TCDmore">
-<%= presenter.attribute_to_html(:rights_statement, render_as: :rights_statement, html_dl: true) %>
-<%= presenter.attribute_to_html(:copyright_note, html_dl: true) %>
-<%= presenter.attribute_to_html(:copyright_status, html_dl: true) %>
-<%= presenter.attribute_to_html(:license, render_as: :external_link, html_dl: true) %>
+
+
+
 <%= presenter.attribute_to_html(:publisher_location, html_dl: true) %>
 <%= presenter.attribute_to_html(:publisher, render_as: :faceted, html_dl: true) %>
 <%= presenter.attribute_to_html(:date_created, label: t('hyrax.base.show.date_created'), html_dl: true) %>
@@ -55,12 +207,97 @@
 <!--  presenter.attribute_to_html(:based_near_label, html_dl: true)  -->
 
 
-
-
-
-
-
-
-
 </span>
 <button onclick="TCDCollapsibleFunction()" id="TCDMoreBtn">Read more</button>
+
+<script>
+document.addEventListener("turbolinks:load", function () {
+  const licenseDts = document.querySelectorAll("dt");
+
+  licenseDts.forEach(function (dt) {
+    if (dt.textContent.trim() === "Licence") {
+      const dd = dt.nextElementSibling;
+      if (dd && dd.tagName === "DD") {
+        let licenseLink = dd.querySelector("a");
+        let licenseText = dd.textContent.trim();
+
+        // Check if CC logo already exists to prevent duplicates
+        const existingLogo = dd.querySelector("img[src*='licensebuttons.net']");
+        if (existingLogo) {
+          return; // Logo already exists, skip processing
+        }
+
+        // If plain text CC-BY, convert it into a link + logo
+        if (!licenseLink && (licenseText.includes("Creative Commons BY Attribution 4.0 International") || licenseText.toLowerCase().includes("creative commons by attribution 4.0 international"))) {
+          dd.innerHTML = ""; // clear out existing text
+          
+          // Create wrapper structure: <ul><li>...</li></ul>
+          const ul = document.createElement("ul");
+          ul.className = "tabular";
+          const li = document.createElement("li");
+          li.className = "attribute attribute-license";
+
+          // Create license link
+          licenseLink = document.createElement("a");
+          licenseLink.href = "https://creativecommons.org/licenses/by/4.0/";
+          licenseLink.target = "_blank";
+          licenseLink.textContent = "CC-BY";
+
+          // Create CC logo
+          const ccLogo = document.createElement("img");
+          ccLogo.src = "https://licensebuttons.net/l/by/4.0/88x31.png";
+          ccLogo.alt = "Creative Commons BY";
+          ccLogo.style.marginLeft = "0.5em";
+          ccLogo.style.marginBottom = "0.2em";
+
+          // Append into structure
+          li.appendChild(licenseLink);
+          li.appendChild(ccLogo);
+          ul.appendChild(li);
+          dd.appendChild(ul);
+        }
+
+        // If an existing link already there, reformat into UL > LI
+        else if (licenseLink) {
+          const hrefMatch = licenseLink.getAttribute("href") === "https://creativecommons.org/licenses/by/4.0/";
+          const textMatch = licenseLink.textContent.trim().includes("Creative Commons BY Attribution 4.0 International");
+
+          if (hrefMatch || textMatch) {
+            // Standardize text and href
+            licenseLink.href = "https://creativecommons.org/licenses/by/4.0/";
+            licenseLink.target = "_blank";
+            licenseLink.textContent = "CC-BY";
+
+            // Create CC logo
+            const ccLogo = document.createElement("img");
+            ccLogo.src = "https://licensebuttons.net/l/by/4.0/88x31.png";
+            ccLogo.alt = "Creative Commons BY";
+            ccLogo.style.marginLeft = "0.5em";
+            ccLogo.style.marginBottom = "0.2em";
+
+            // Wrap into UL/LI structure if not already
+            if (!dd.querySelector("ul")) {
+              const ul = document.createElement("ul");
+              ul.className = "tabular";
+              const li = document.createElement("li");
+              li.className = "attribute attribute-license";
+
+              li.appendChild(licenseLink.cloneNode(true));
+              li.appendChild(ccLogo);
+              ul.appendChild(li);
+
+              dd.innerHTML = "";
+              dd.appendChild(ul);
+            } else {
+              // Only append logo if it doesn't already exist
+              if (!dd.querySelector("img[src*='licensebuttons.net']")) {
+                licenseLink.parentNode.appendChild(ccLogo);
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+});
+</script>

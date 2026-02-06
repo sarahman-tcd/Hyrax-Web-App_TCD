@@ -38,6 +38,7 @@ Rails.application.routes.draw do
   get '/export/dublinCore.xml', to: 'export#dublinCore', constraints: DublinCoreParamsConstraint.new
   # get '/iiif/*path', to: 'riiif/images#show', constraints: AboutParamsConstraint.new
   get '/search_assist/index', to: 'search_assist#index', constraints: AboutParamsConstraint.new
+  get '/autocomplete/titles', to: 'autocomplete#titles', constraints: AboutParamsConstraint.new
 
   get '/zotero', to: 'hyrax/static#zotero', constraints: AboutParamsConstraint.new
   get '/mendeley', to: 'hyrax/static#mendeley', constraints: AboutParamsConstraint.new
@@ -63,18 +64,20 @@ Rails.application.routes.draw do
 
   # get 'pdf_generation/check_pdf_file_exists/:file_set_id', to: 'pdf_generation#check_pdf_file_exists', constraints: AboutParamsConstraint.new
   # # End
+  get 'folder_numbers/exportCSV', to: 'folder_numbers#exportCSV', defaults: { format: 'csv' }
+
 
   constraints IIIFParamsConstraint.new do
     get '/iiif/2/*path', to: 'riiif/images#show', format: false
   end
   #end here
 
-
+  
   get '/catalog/browse_location', to: 'catalog#browse_location', as: 'browse_location'
   get '/catalog/combined_search', to: 'catalog#combined_search', as: 'combined_search'
-
-
-
+  get '/catalog/filtered_search', to: 'catalog#filtered_search', as: 'filtered_search'
+  
+  
   post 'catalog/save_tile_order', to: 'catalog#save_tile_order'
   get 'catalog/get_title_orders', to: 'catalog#get_title_orders'
   
@@ -135,6 +138,8 @@ Rails.application.routes.draw do
   mount Hydra::RoleManagement::Engine => '/'
 
   mount Qa::Engine => '/authorities'
+  get '/dashboard/repository_growth_data', to: 'hyrax/dashboard#repository_growth_data'
+  get '/dashboard/repository_image_growth_data', to: 'hyrax/dashboard#repository_image_growth_data'
   mount Hyrax::Engine, at: '/'
   resources :welcome, only: 'index'
   # root 'hyrax/homepage#index'

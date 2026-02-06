@@ -69,3 +69,15 @@ $(document).ready(function() {
 });
 </script>
 
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  document.body.addEventListener("click", function (event) {
+    const downloadBtn = event.target.closest(".buttons a.btn.btn-primary");
+    if (downloadBtn && downloadBtn.textContent.trim() === "Download") {
+      event.preventDefault(); // stop default link behavior
+      alert("Download clicked.");
+    }
+  });
+});
+
+</script>

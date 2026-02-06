@@ -2,7 +2,7 @@
 <div id="documents" class="noresults">
   <h3><%= t 'blacklight.search.zero_results.modify_search' %></h3>
   <ul>
-    <li>Please try a different Creation Date range</li>
+    <li>Please try a different date range</li>
     <li><%= t 'blacklight.search.zero_results.use_fewer_keywords' %></li>
 
     <%- if params[:q] and params[:search_field] and params[:search_field] != blacklight_config.default_search_field.try(:key) -%>

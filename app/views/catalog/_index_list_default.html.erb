@@ -1,39 +1,83 @@
-<div class="col-md-6">
-  <div class="metadata">
-    <dl class="dl-horizontal">
-    <% doc_presenter = index_presenter(document) %>
-    <% index_fields(document).each do |field_name, field| -%>
-      <% if should_render_index_field? document, field %>
-        <dt><%= render_index_field_label document, field: field_name %></dt>
-        <dd><%= doc_presenter.field_value field_name %></dd>
+<div class="col-md-12">
+  <div class="ajax-result-card">
+    <%# Thumbnail Section %>
+    <div class="ajax-thumbnail-container">
+      <% if document.thumbnail_path.present? %>
+        <%= link_to url_for_document(document) do %>
+          <%= image_tag document.thumbnail_path, class: "ajax-thumbnail", alt: document.title_or_label %>
+        <% end %>
+      <% else %>
+        <%= link_to url_for_document(document), class: "placeholder-thumbnail" do %>
+          <span class="glyphicon glyphicon-file placeholder-icon"></span>
+        <% end %>
       <% end %>
-    <% end %>
-    </dl>
-  </div>
-</div>
-<% if(doc_presenter.field_value('has_model_ssim') == 'Collection') %>
-    <% collection_presenter = Hyrax::CollectionPresenter.new(document, current_ability) %>
-<div class="col-md-4">
-  <div class="collection-counts-wrapper">
-    <div class="collection-counts-item">
-      <span><%= collection_presenter.total_viewable_collections %></span>Collections
-    </div>
-    <div class="collection-counts-item">
-      <span><%= collection_presenter.total_viewable_works %></span>Works
     </div>
 
-    <% if user_signed_in?%>
-    <div class="collection-counts-item tileOrderContainer">            
-        <span class="addText" id="<%= doc_presenter.field_value('id').parameterize %>" style="display:inline-block;">Add</span>
-        <input type="text" class="text-box" style="display: none; width: 25px;">
-        <br>
-        Tile Order 
-    </div> 
-    <% end %>
+    <%# Content Section %>
+    <div class="ajax-content">
+      <h3 class="ajax-title">
+        <%= link_to document.title_or_label, url_for_document(document) %>
+      </h3>
 
+      <%# Abstract (Max 2 lines, grey) %>
+      <% if document['abstract_tesim'].present? %>
+        <div class="ajax-abstract" title="<%= document['abstract_tesim'].join(' ') %>">
+          <%= document['abstract_tesim'].join(' ') %>
+        </div>
+      <% end %>
 
+      <div class="ajax-metadata ajax-meta-grid">
+        <% doc_presenter = index_presenter(document) %>
+        
+        <%# Helper to render a row %>
+        <% render_row = proc do |label, field| %>
+          <% if document[field].present? %>
+            <div class="ajax-meta-row">
+              <span class="ajax-label"><%= label %>:</span>
+              <span class="ajax-value truncate-1-line" title="<%= document[field].join(', ') %>">
+                <%= document[field].join(', ') %>
+              </span>
+            </div>
+          <% end %>
+        <% end %>
+
+        <%# Render Fields in Grid %>
+        <% render_row.call('Creator', 'creator_tesim') %>
+        <% render_row.call('Contributor', 'contributor_tesim') %>
+        <% render_row.call('Keyword', 'keyword_tesim') %>
+        <% render_row.call('Subject', 'subject_tesim') %>
+        <% render_row.call('Publisher', 'publisher_tesim') %>
+        <% render_row.call('Shelf Mark', 'identifier_tesim') %>
+        <% render_row.call('Copyright', 'copyright_note_tesim') %>
+        <% render_row.call('DOI', 'digital_object_identifier_tesim') %>
+        <% render_row.call('Date', 'date_created_tesim') %>
+        <% render_row.call('Type', 'resource_type_tesim') %>
+      </div>
+
+        <%# Collection Counts & Tile Order (Preserved from original) %>
+        <% if(doc_presenter.field_value('has_model_ssim') == 'Collection') %>
+          <% collection_presenter = Hyrax::CollectionPresenter.new(document, current_ability) %>
+          <div class="collection-counts-wrapper" style="margin-top: 10px;">
+            <div class="collection-counts-item">
+              <span><%= collection_presenter.total_viewable_collections %></span>Collections
+            </div>
+            <div class="collection-counts-item">
+              <span><%= collection_presenter.total_viewable_works %></span>Works
+            </div>
+
+            <% if user_signed_in?%>
+            <div class="collection-counts-item tileOrderContainer">            
+                <span class="addText" id="<%= doc_presenter.field_value('id').parameterize %>" style="display:inline-block;">Add</span>
+                <input type="text" class="text-box" style="display: none; width: 25px;">
+                <br>
+                Tile Order 
+            </div> 
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    </div>
   </div>
-</div>
-<% end %>
+
 
 

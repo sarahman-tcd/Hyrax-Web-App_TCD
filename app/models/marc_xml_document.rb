@@ -5,156 +5,174 @@ class MarcXmlDocument # < Nokogiri::XML::Document
   def initialize(marcxml_file)
     #byebug
     @source_file = marcxml_file
-    @all_marcxml = File.open(@source_file) { |f| Nokogiri::XML(f) }
+    @marcxml = File.open(@source_file) { |f| Nokogiri::XML(f) }
   end
 
   def ark_id
     #byebug
-    @marcxml.xpath("//controlfield[@tag='001']").text
+    @marcxml.xpath("//*[local-name()='controlfield'][@tag='001']").text
   end
 
   def title
-    @marcxml.xpath("//datafield[@tag='245']")
+    @marcxml.xpath("//*[local-name()='datafield'][@tag='245']")
   end
 
+  
   def rights_statements
-      @marcxml.xpath("//datafield[@tag='542'][@ind1=' '] | //datafield[@tag='542'][@ind1='1'] ")
+    @marcxml.xpath("//*[local-name()='datafield'][@tag='542']")
+  end
+
+  def copyright_status
+    @marcxml.xpath("//*[local-name()='datafield'][@tag='542']")
   end
 
   def copyright_notes
-      @marcxml.xpath("//datafield[@tag='542'][@ind1=' '] | //datafield[@tag='542'][@ind1='1'] ")
+    @marcxml.xpath("//*[local-name()='datafield'][@tag='542']")
   end
 
+  def license
+    @marcxml.xpath("//*[local-name()='datafield'][@tag='540']")
+  end
+
+
+  # def rights_statements
+  #     @marcxml.xpath("//datafield[@tag='542'][@ind1=' '] | //datafield[@tag='542'][@ind1='1'] ")
+  # end
+
+  # def copyright_notes
+  #     @marcxml.xpath("//datafield[@tag='542'][@ind1=' '] | //datafield[@tag='542'][@ind1='1'] ")
+  # end
+
   def genres
-    @marcxml.xpath("//datafield[@tag='655']")
+    @marcxml.xpath("//*[local-name()='datafield'][@tag='655']")
   end
 
   def abstracts
-    @marcxml.xpath("//datafield[@tag='520']")
+    @marcxml.xpath("//*[local-name()='datafield'][@tag='520']")
   end
 
   def identifiers
-    @marcxml.xpath("//datafield[@tag='534']/subfield[@code='o']")
+    @marcxml.xpath("//*[local-name()='datafield'][@tag='534']/*[local-name()='subfield'][@code='o']")
   end
 
   def locations
-    @marcxml.xpath("//datafield[@tag='534']/subfield[@code='l']")
+    @marcxml.xpath("//*[local-name()='datafield'][@tag='534']/*[local-name()='subfield'][@code='l']")
   end
 
   def creators
-    @marcxml.xpath("//datafield[@tag='100'] | //datafield[@tag='110'] | //datafield[@tag='111'] | //datafield[@tag='700'] | //datafield[@tag='710'] | //datafield[@tag='711']")
+    @marcxml.xpath("//*[local-name()='datafield'][@tag='100'] | //*[local-name()='datafield'][@tag='110'] | //*[local-name()='datafield'][@tag='111'] | //*[local-name()='datafield'][@tag='700'] | //*[local-name()='datafield'][@tag='710'] | //*[local-name()='datafield'][@tag='711']")
   end
 
   def contributors
-    @marcxml.xpath("//datafield[@tag='100'] | //datafield[@tag='110'] | //datafield[@tag='111'] | //datafield[@tag='700'] | //datafield[@tag='710'] | //datafield[@tag='711']")
+    @marcxml.xpath("//*[local-name()='datafield'][@tag='100'] | //*[local-name()='datafield'][@tag='110'] | //*[local-name()='datafield'][@tag='111'] | //*[local-name()='datafield'][@tag='700'] | //*[local-name()='datafield'][@tag='710'] | //*[local-name()='datafield'][@tag='711']")
   end
 
   def publisher_locations
-    @marcxml.xpath("//datafield[@tag='264']/subfield[@code='a']")
+    @marcxml.xpath("//*[local-name()='datafield'][@tag='264']/*[local-name()='subfield'][@code='a']")
   end
 
   def publishers
-    @marcxml.xpath("//datafield[@tag='264']/subfield[@code='b']")
+    @marcxml.xpath("//*[local-name()='datafield'][@tag='264']/*[local-name()='subfield'][@code='b']")
   end
 
   def dates_created
-    @marcxml.xpath("//datafield[@tag='264']/subfield[@code='c']")
+    @marcxml.xpath("//*[local-name()='datafield'][@tag='264']/*[local-name()='subfield'][@code='c']")
   end
 
   def languages
-    @marcxml.xpath("//datafield[@tag='041']/subfield[@code='a']")
+    @marcxml.xpath("//*[local-name()='datafield'][@tag='041']/*[local-name()='subfield'][@code='a']")
   end
 
   def related_urls
-    @marcxml.xpath("//datafield[@tag='545']/subfield[@code='u'] | //datafield[@tag='555']/subfield[@code='u']")
+    @marcxml.xpath("//*[local-name()='datafield'][@tag='545']/*[local-name()='subfield'][@code='u'] | //*[local-name()='datafield'][@tag='555']/*[local-name()='subfield'][@code='u']")
   end
 
   def sponsors
-    @marcxml.xpath("//datafield[@tag='536']/subfield[@code='a']")
+    @marcxml.xpath("//*[local-name()='datafield'][@tag='536']/*[local-name()='subfield'][@code='a']")
   end
 
   def subjects_and_keywords
-    @marcxml.xpath("//datafield[@tag='600'] | //datafield[@tag='610'] | //datafield[@tag='611'] | //datafield[@tag='647'] | //datafield[@tag='648'] | //datafield[@tag='650'] | //datafield[@tag='651']")
+    @marcxml.xpath("//*[local-name()='datafield'][@tag='600'] | //*[local-name()='datafield'][@tag='610'] | //*[local-name()='datafield'][@tag='611'] | //*[local-name()='datafield'][@tag='647'] | //*[local-name()='datafield'][@tag='648'] | //*[local-name()='datafield'][@tag='650'] | //*[local-name()='datafield'][@tag='651']")
   end
 
   def resource_types
-    @marcxml.xpath("//datafield[@tag='336']/subfield[@code='a']")
+    @marcxml.xpath("//*[local-name()='datafield'][@tag='336']/*[local-name()='subfield'][@code='a']")
   end
 
   def mediums
-    @marcxml.xpath("//datafield[@tag='340']/subfield[@code='c']")
+    @marcxml.xpath("//*[local-name()='datafield'][@tag='340']/*[local-name()='subfield'][@code='c']")
   end
 
   def supports
-    @marcxml.xpath("//datafield[@tag='340']/subfield[@code='a'] | //datafield[@tag='340']/subfield[@code='e']")
+    @marcxml.xpath("//*[local-name()='datafield'][@tag='340']/*[local-name()='subfield'][@code='a'] | //*[local-name()='datafield'][@tag='340']/*[local-name()='subfield'][@code='e']")
   end
 
   def digital_object_identifier
-    @marcxml.xpath("//datafield[@tag='019']/subfield[@code='e']").text
+    @marcxml.xpath("//*[local-name()='datafield'][@tag='019']/*[local-name()='subfield'][@code='e']").text
   end
 
   def folder_number
-    @marcxml.xpath("//datafield[@tag='019']/subfield[@code='b']").text
+    @marcxml.xpath("//*[local-name()='datafield'][@tag='019']/*[local-name()='subfield'][@code='b']").text
   end
 
   def digital_root_number
-    @marcxml.xpath("//datafield[@tag='019']/subfield[@code='d']").text
+    @marcxml.xpath("//*[local-name()='datafield'][@tag='019']/*[local-name()='subfield'][@code='d']").text
   end
 
   def image_range
-    @marcxml.xpath("//datafield[@tag='019']/subfield[@code='f']").text
+    @marcxml.xpath("//*[local-name()='datafield'][@tag='019']/*[local-name()='subfield'][@code='f']").text
   end
 
   def dris_unique
-    @marcxml.xpath("//controlfield[@tag='001']").text
+    @marcxml.xpath("//*[local-name()='controlfield'][@tag='001']").text
   end
 
   def biographical_notes
-    @marcxml.xpath("//datafield[@tag='545']")
+    @marcxml.xpath("//*[local-name()='datafield'][@tag='545']")
   end
 
   def finding_aids
-    @marcxml.xpath("//datafield[@tag='555']")
+    @marcxml.xpath("//*[local-name()='datafield'][@tag='555']")
   end
 
   def alternative_titles
-    @marcxml.xpath("//datafield[@tag='246']")
+    @marcxml.xpath("//*[local-name()='datafield'][@tag='246']")
   end
 
   def physical_extents
-    @marcxml.xpath("//datafield[@tag='300']")
+    @marcxml.xpath("//*[local-name()='datafield'][@tag='300']")
   end
 
   def series_titles
-    @marcxml.xpath("//datafield[@tag='490'][@ind1='0'] | //datafield[@tag='830']")
+    @marcxml.xpath("//*[local-name()='datafield'][@tag='490'][@ind1='0'] | //*[local-name()='datafield'][@tag='830']")
   end
 
   def provenances
-    @marcxml.xpath("//datafield[@tag='561'][@ind1=' '] | //datafield[@tag='561'][@ind1='1'] ")
+    @marcxml.xpath("//*[local-name()='datafield'][@tag='561'][@ind1=' '] | //*[local-name()='datafield'][@tag='561'][@ind1='1'] ")
   end
 
   def bibliographys
-    @marcxml.xpath("//datafield[@tag='510']/subfield[@code='a']")
+    @marcxml.xpath("//*[local-name()='datafield'][@tag='510']/*[local-name()='subfield'][@code='a']")
   end
 
   def notes
-    @marcxml.xpath("//datafield[@tag='500']/subfield[@code='a'] | //datafield[@tag='546']/subfield[@code='a']")
+    @marcxml.xpath("//*[local-name()='datafield'][@tag='500']/*[local-name()='subfield'][@code='a'] | //*[local-name()='datafield'][@tag='546']/*[local-name()='subfield'][@code='a']")
   end
 
   def collection_titles
-    @marcxml.xpath("//datafield[@tag='773']")
+    @marcxml.xpath("//*[local-name()='datafield'][@tag='773']")
   end
 
   def sub_fonds
-    @marcxml.xpath("//datafield[@tag='773'] | //datafield[@tag='774']")
+    @marcxml.xpath("//*[local-name()='datafield'][@tag='773'] | //*[local-name()='datafield'][@tag='774']")
   end
 
   def arrangements
-    @marcxml.xpath("//datafield[@tag='351']")
+    @marcxml.xpath("//*[local-name()='datafield'][@tag='351']")
   end
 
   def issued_withs
-    @marcxml.xpath("//datafield[@tag='501']/subfield[@code='a']")
+    @marcxml.xpath("//*[local-name()='datafield'][@tag='501']/*[local-name()='subfield'][@code='a']")
   end
 
 end

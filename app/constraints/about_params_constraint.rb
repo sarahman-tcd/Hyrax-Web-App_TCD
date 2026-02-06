@@ -1,5 +1,5 @@
 class AboutParamsConstraint
-    ALLOWED_PARAMS = ['locale', 'file', 'page'].freeze
+    ALLOWED_PARAMS = ['locale', 'file', 'page', 'q', 'term'].freeze
     ALLOWED_LOCALES = ['en', 'pt-BR', 'de', 'es', 'fr', 'ga', 'it', 'zh'].freeze
   
     def matches?(request)

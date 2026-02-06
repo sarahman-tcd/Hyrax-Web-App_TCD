@@ -4,6 +4,13 @@ require 'nokogiri'
 module Bulkrax
   # Generic XML Entry
   class MarcXmlEntry < Entry
+    include Bulkrax::HasLocalProcessing
+
+    def initialize(attributes = {})
+      Rails.logger.debug "DEBUG: MarcXmlEntry initialize called with attributes: #{attributes.inspect}"
+      super
+    end
+
     serialize :raw_metadata, JSON
 
     def self.fields_from_data(data); end
@@ -49,6 +56,7 @@ module Bulkrax
     end
 
     def build_metadata
+      Rails.logger.debug "DEBUG: build_metadata method called in MarcXmlEntry"
       raise StandardError, 'Record not found' if record.nil?
       raise StandardError, 'Missing source identifier' if source_identifier.blank?
       self.parsed_metadata = {}
@@ -61,7 +69,9 @@ module Bulkrax
       add_title
       add_visibility
       add_rights_statement
+      add_copyright_status
       add_copyright_note
+      add_license
       add_genres
       add_abstracts
       add_identifiers # => shelf mark
@@ -105,38 +115,193 @@ module Bulkrax
 
     def add_title
       self.parsed_metadata['title'] = []
-      code_a = record.title.xpath("subfield[@code='a']").text.strip
-      code_b = record.title.xpath("subfield[@code='b']").text.strip
-      code_n = record.title.xpath("subfield[@code='n']").text.strip
-      code_p = record.title.xpath("subfield[@code='p']").text.strip
-      self.parsed_metadata['title']  << (code_a + " " + code_b + " " + code_n + " " + code_p).strip.chomp("/").sub!(/[?.:,;]?$/, '')
+      
+      # Safety check: ensure record.title exists and is not empty
+      title_nodes = record.title
+      if title_nodes && title_nodes.any?
+        title_nodes.each do |title_node|
+          code_a = title_node.xpath("subfield[@code='a']").text.strip
+          code_b = title_node.xpath("subfield[@code='b']").text.strip
+          code_n = title_node.xpath("subfield[@code='n']").text.strip
+          code_p = title_node.xpath("subfield[@code='p']").text.strip
+          title_text = (code_a + " " + code_b + " " + code_n + " " + code_p).strip.chomp("/").sub!(/[?.:,;]?$/, '')
+          self.parsed_metadata['title'] << title_text unless title_text.blank?
+        end
+      end
+      
+      # If no title was found, add a default
+      if self.parsed_metadata['title'].empty?
+        self.parsed_metadata['title'] << "Untitled"
+      end
     end
 
     def add_rights_statement
       self.parsed_metadata['rights_statement'] = []
-      record.rights_statements.each  do | stmt |
-        code_l = stmt.xpath("subfield[@code='l']").text.strip
-        if !code_l.empty?
-          # lookup the note text (id), we received the term. See config/authorities/rights_statements.yml
-          rights = Hyrax.config.rights_statement_service_class.new
-          active_rights = rights.select_active_options
-          note_text = active_rights.find{|(x, y)| x == code_l}
-          self.parsed_metadata['rights_statement'] << note_text[1]
+      
+      # Safety check: ensure record.rights_statements exists and is not empty
+      rights_nodes = record.rights_statements
+      if rights_nodes && rights_nodes.any?
+        rights_nodes.each do |stmt|
+          code_f = stmt.xpath(".//*[local-name()='subfield'][@code='f']").text.strip
+          if !code_f.empty?
+            # Map the MARC XML value to rights statement dropdown option (exact match only)
+            mapped_rights = map_rights_statement_to_dropdown(code_f)
+            self.parsed_metadata['rights_statement'] << mapped_rights
+          end
         end
       end
-      if self.parsed_metadata['rights_statement'].empty?
+      
+      # Only set default during actual import operations
+      # Check if we're actually importing by looking for source_identifier
+      if self.parsed_metadata['rights_statement'].empty? && source_identifier.present?
         self.parsed_metadata['rights_statement'] << "Copyright The Board of Trinity College Dublin. Images are available for single-use academic application only. Publication, transmission or display is prohibited without formal written approval of the Library of Trinity College, Dublin."
+      end
+    end
+
+    def add_copyright_status
+      self.parsed_metadata['copyright_status'] = []
+      
+      # Safety check: ensure record.copyright_status exists and is not empty
+      copyright_nodes = record.copyright_status
+      if copyright_nodes && copyright_nodes.any?
+        copyright_nodes.each do |stmt|
+          code_l = stmt.xpath(".//*[local-name()='subfield'][@code='l']").text.strip
+          if !code_l.empty?
+            self.parsed_metadata['copyright_status'] << code_l
+          end
+        end
       end
     end
 
     def add_copyright_note
       self.parsed_metadata['copyright_note'] = []
-      record.copyright_notes.each  do | note |
-        code_f = note.xpath("subfield[@code='f']").text.strip
-        if !code_f.empty?
-          self.parsed_metadata['copyright_note'] << code_f
+      
+      # Safety check: ensure record.copyright_notes exists and is not empty
+      copyright_note_nodes = record.copyright_notes
+      if copyright_note_nodes && copyright_note_nodes.any?
+        copyright_note_nodes.each do |note|
+          code_n = note.xpath(".//*[local-name()='subfield'][@code='n']").text.strip
+          if !code_n.empty?
+            self.parsed_metadata['copyright_note'] << code_n
+          end
         end
       end
+    end
+
+    def add_license
+      self.parsed_metadata['license'] = []
+      
+      # Safety check: ensure record.license exists and is not empty
+      license_nodes = record.license
+      if license_nodes && license_nodes.any?
+        license_nodes.each do |lic|
+          code_f = lic.xpath(".//*[local-name()='subfield'][@code='f']").text.strip
+          if !code_f.empty?
+            # Map the MARC XML value to license dropdown option (exact match only)
+            mapped_license = map_license_to_dropdown(code_f)
+            self.parsed_metadata['license'] << mapped_license
+          end
+        end
+      end
+      
+      # If no licenses were found, ensure we have an empty array (not nil)
+      # This prevents issues with the license service
+      self.parsed_metadata['license'] = [] if self.parsed_metadata['license'].nil?
+    end
+
+    def collections_created?
+      return true if importerexporter.parser_fields['parent_id'].blank?
+      return true unless find_or_create_collection_ids.blank?
+    end
+
+    def find_or_create_collection_ids
+      self.collection_ids = [parent.id] if parent?
+      collection_ids
+    rescue StandardError
+      []
+    end
+
+    def parent?
+      !parent.blank?
+    end
+
+    def parent
+      @parent ||= ActiveFedora::Base.find(importerexporter.parser_fields['parent_id'])
+    rescue StandardError
+      nil
+    end
+
+    def parent_attributes
+      @parent_attributes ||= parent.attributes if parent?
+    end
+
+    def parent_collection?
+      parent.is_a?(Collection)
+    end
+
+    def factory_class
+      importerexporter.parser_fields['object_type'].constantize
+    end
+
+    private
+
+    def map_license_to_dropdown(marc_value)
+      # Load the active license terms from the YAML file
+      licenses_file = Rails.root.join('config', 'authorities', 'licenses.yml')
+      return marc_value unless File.exist?(licenses_file)
+      
+      licenses_data = YAML.load_file(licenses_file)
+      active_licenses = licenses_data['terms'].select { |term| term['active'] }
+      
+      # Find exact match by comparing the MARC value with license terms
+      marc_value_downcase = marc_value.downcase.strip
+      
+      active_licenses.each do |license|
+        term_downcase = license['term'].downcase.strip
+        id = license['id']
+        
+        # Exact term match only
+        if marc_value_downcase == term_downcase
+          return id
+        end
+      end
+      
+      # If no exact match found, return the original value
+      marc_value
+    end
+
+    def map_rights_statement_to_dropdown(marc_value)
+      # Load the active rights statement terms from the YAML file
+      rights_file = Rails.root.join('config', 'authorities', 'rights_statements.yml')
+      return marc_value unless File.exist?(rights_file)
+      
+      rights_data = YAML.load_file(rights_file)
+      active_rights = rights_data['terms'].select { |term| term['active'] }
+      
+      # Debug: Log what we're looking for
+      Rails.logger.debug "debug: MARC XML rights statement value: '#{marc_value}'"
+      Rails.logger.debug "debug: Available active rights terms: #{active_rights.map { |r| r['term'] }}"
+      
+      # Find exact match by comparing the MARC value with rights statement terms
+      marc_value_downcase = marc_value.downcase.strip
+      
+      active_rights.each do |rights|
+        term_downcase = rights['term'].downcase.strip
+        id = rights['id']
+        
+        # Debug: Log each comparison
+        Rails.logger.debug "debug:Comparing: '#{marc_value_downcase}' with '#{term_downcase}' -> ID: '#{id}'"
+        
+        # Exact term match only
+        if marc_value_downcase == term_downcase
+          Rails.logger.debug "debug: MATCH FOUND! Returning ID: '#{id}'"
+          return id
+        end
+      end
+      
+      Rails.logger.debug "debug: No match found, returning original value: '#{marc_value}'"
+      # If no exact match found, return the original value
+      marc_value
     end
 
     def add_genres
@@ -193,7 +358,7 @@ module Bulkrax
       self.parsed_metadata['creator'] = []
       self.parsed_metadata['creator_loc'] = []
       self.parsed_metadata['creator_local'] = []
-      record.creators.each do | cre |
+      record.creators.each do |cre|
         code_a = cre.xpath("subfield[@code='a']").text.strip  # surname
         code_b = cre.xpath("subfield[@code='b']").text.strip  #
         code_c = cre.xpath("subfield[@code='c']").text.strip  # persons title
@@ -206,9 +371,11 @@ module Bulkrax
         code_2 = cre.xpath("subfield[@code='2']").text.strip  #
         #byebug
         a_creator = ""
-        if (cre.values[0].eql? "100") || (cre.values[0].eql? "700")
+        # Safely get the tag value, defaulting to empty string if values is nil
+        tag_value = cre.values&.first || ""
+        if (tag_value.eql? "100") || (tag_value.eql? "700")
           a_creator = (code_a + ' ' + code_b + ' ' + code_c + ' ' + code_q + ' ' + code_d + ' ' + code_e).strip
-        else if (cre.values[0].eql? "111") || (cre.values[0].eql? "711")
+        else if (tag_value.eql? "111") || (tag_value.eql? "711")
             #$a $n $d $c $e $j
             a_creator = (code_a + ' ' + code_n + ' ' + code_d + ' ' + code_c + ' ' + code_e + ' ' + code_j).strip
                else # 110 or 710
@@ -229,7 +396,7 @@ module Bulkrax
 
     def add_contributors
       self.parsed_metadata['contributor'] = []
-      record.creators.each do | con |
+      record.creators.each do |con|
         code_a = con.xpath("subfield[@code='a']").text.strip  # surname
         code_b = con.xpath("subfield[@code='b']").text.strip  #
         code_c = con.xpath("subfield[@code='c']").text.strip  # persons title
@@ -242,9 +409,11 @@ module Bulkrax
         code_2 = con.xpath("subfield[@code='2']").text.strip  # means role code is local
         # a_contributor = code_a + ' ' + code_q + ' ' + code_d + ' ' + code_e
         a_contributor = ""
-        if (con.values[0].eql? "100") || (con.values[0].eql? "700")
+        # Safely get the tag value, defaulting to empty string if values is nil
+        tag_value = con.values&.first || ""
+        if (tag_value.eql? "100") || (tag_value.eql? "700")
           a_contributor = (code_a + ' ' + code_q + ' ' + code_b + ' ' + code_c + ' ' + code_d + ' ' + code_e).strip
-        else if (con.values[0].eql? "111") || (con.values[0].eql? "711")
+        else if (tag_value.eql? "111") || (tag_value.eql? "711")
             #$a $n $d $c $e $j
             a_contributor = (code_a + ' ' + code_n + ' ' + code_d + ' ' + code_c + ' ' + code_e + ' ' + code_j).strip
                else # 110 or 710
@@ -321,7 +490,9 @@ module Bulkrax
         code_z = subj.xpath("subfield[@code='z']").text.strip.sub!(/[?.:,;]?$/, '')
         code_2 = subj.xpath("subfield[@code='2']").text.strip.sub!(/[?.:,;]?$/, '')  # check if role code is local
         #byebug
-        case subj.values[0]
+        # Safely get the tag value, defaulting to empty string if values is nil
+        tag_value = subj.values&.first || ""
+        case tag_value
         when '611'
            a_keyword = (code_a + ' ' + code_n  + ' ' + code_d + ' ' + code_c + ' ' + code_e + ' ' + code_l  + '--' + code_t + '--' + code_x + '--' + code_z  + '--' + code_y + '--' + code_v + ' ' + code_j).strip
         else # '600', '610', '647', '648', '650', '651'
@@ -514,40 +685,6 @@ module Bulkrax
           self.parsed_metadata['sub_fond'] << code_t
         end
       end
-    end
-
-    def collections_created?
-      return true if importerexporter.parser_fields['parent_id'].blank?
-      return true unless find_or_create_collection_ids.blank?
-    end
-
-    def find_or_create_collection_ids
-      self.collection_ids = [parent.id] if parent?
-      collection_ids
-    rescue StandardError
-      []
-    end
-
-    def parent?
-      !parent.blank?
-    end
-
-    def parent
-      @parent ||= ActiveFedora::Base.find(importerexporter.parser_fields['parent_id'])
-    rescue StandardError
-      nil
-    end
-
-    def parent_attributes
-      @parent_attributes ||= parent.attributes if parent?
-    end
-
-    def parent_collection?
-      parent.is_a?(Collection)
-    end
-
-    def factory_class
-      importerexporter.parser_fields['object_type'].constantize
     end
 
   end

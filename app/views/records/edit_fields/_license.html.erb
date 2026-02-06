@@ -1,0 +1,26 @@
+<%# License field with dropdown and fallback to text input %>
+<% begin %>
+  <% license_service = Hyrax.config.license_service_class.new %>
+  <%# Debug: Check what the service returns %>
+  <% active_options = license_service.select_active_options %>
+  <% if active_options.any? %>
+    <%= f.input :license, as: :multi_value_select,
+        collection: active_options,
+        include_blank: true,
+        item_helper: license_service.method(:include_current_value),
+        input_html: { class: 'form-control' },
+        required: f.object.required?(:license) %>
+  <% else %>
+    <%# Debug: Service returned empty collection %>
+    <p style="color: red;">DEBUG: License service returned empty collection</p>
+    <%= f.input :license, as: :multi_value, 
+        input_html: { class: 'form-control' },
+        required: f.object.required?(:license) %>
+  <% end %>
+<% rescue => e %>
+  <%# Debug: Service failed completely %>
+  <p style="color: red;">DEBUG: License service failed: <%= e.message %></p>
+  <%= f.input :license, as: :multi_value, 
+      input_html: { class: 'form-control' },
+      required: f.object.required?(:license) %>
+<% end %>
