@@ -1,0 +1,8 @@
+port: 8983
+instance_dir: tmp/solr-development
+version: 7.5.0
+mirror_url: https://archive.apache.org/dist/
+collection:
+    name: hydra-development
+    dir: solr/config
+    persist: true

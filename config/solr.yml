@@ -2,7 +2,7 @@
 development:
   url: http://127.0.0.1:8983/solr/hydra-development
 dcdevhyrax:
-  url: http://dcdev-solr.tcd.ie:8983/solr/tcd-hyrax
+  url: http://127.0.0.1:8983/solr/hydra-development
 digcollhyrax01:
   url: http://digcoll-solr01.tcd.ie:8983/solr/tcd-hyrax
 digcollhyrax02:
