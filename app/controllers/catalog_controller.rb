@@ -82,110 +82,66 @@ class CatalogController < ApplicationController
  #--------Tile Order------#
 
  #--------Browse Publisher Location Using Map------#
-def browse_location_old
-  begin
-    # Try to get search results from request body
-    all_docs = Rails.cache.read("all_search_results") || [] #params[:documents] || []
-
-    if all_docs.empty?
-      Rails.logger.warn "No stored search results found in session"
-      render json: { locations: {}, unidentified: {} } and return
-    end
-    # if all_docs.empty?
-    #   Rails.logger.error "No documents received, fallback to fresh Solr query"
-    #   search_builder.append(:add_publisher_location_filter)
-    #   all_docs = fetch_all_publisher_locations(search_builder)
-    # end
-
-    Rails.logger.debug "Total Documents Received: #{all_docs.size}"
-    Rails.logger.debug "First Document: #{all_docs.first.inspect}" if all_docs.any?
-
-    # Process the documents as before
-    @location_counts = all_docs.group_by { |doc| doc['publisher_location_tesim'].presence }.transform_values(&:count)
-
-    total_count = @location_counts.values.sum
-    Rails.logger.debug "Total count: #{total_count}"
-
-    normalized_location_counts = @location_counts.each_with_object({}) do |(location, count), result|
-      normalized_location = location.is_a?(Array) ? location.join(', ').strip : location.to_s.strip
-      result[normalized_location] ||= 0
-      result[normalized_location] += count
-    end
-
-    unidentified_count = @location_counts.delete(nil) || 0
-    @location_latlong = get_latlong_for_locations(normalized_location_counts)
-
-    Rails.logger.debug "Sending JSON Response: #{@location_latlong.to_json}"
-
-    @unidentified = { "Unidentified" => { count: unidentified_count } }
-
-    render json: { locations: @location_latlong, unidentified: @unidentified }
-  rescue => e
-    Rails.logger.error "Error: #{e.message}, Raised at: #{e.backtrace.first}"
-    render json: { error: e.message }, status: :internal_server_error
-  end
-end
-
-def browse_location
-  begin
-    search_params = params.to_unsafe_h.deep_symbolize_keys
-    search_params[:q] = params[:q].present? ? params[:q] : '*:*'
-    search_params[:page] = 1
-    search_params[:rows] = 100  # Default per page; will loop to get all
-    Rails.logger.debug "this: BL search param with date: #{search_params}"
-    # Optional: extract date range and clean it from query
-    user_input = nil
-    date_range_match = search_params[:q].match(/date_created_tesim:\[(-?\d{1,4})TO(-?\d{1,4})\]/)
-    if date_range_match
-      start_year, end_year = date_range_match.captures.map(&:to_i)
-      user_input = "#{start_year},#{end_year}"
-      search_params[:q].sub!(/AND?\s*\(?date_created_tesim:\[.*?\]\)?/, '')
-    end
-
-        Rails.logger.debug "this: BL search param without date: #{search_params}"
-
-    all_results = []
-    current_page = 1
-
-    loop do
-      search_params[:page] = current_page
-      response, docs = search_results(search_params)
-      all_results.concat(docs)
-
-      break if docs.size < search_params[:rows].to_i
-      current_page += 1
-    end
-
-    if start_year && end_year && date_range_match
-      all_results = filter_documents_by_date_range(all_results, user_input)
-    end
-
-    # Then continue your logic with `all_results`
-    normalized_location_counts = Hash.new { |hash, key| hash[key] = { count: 0, ids: [] } }
-
-    all_results.each do |doc|
-      raw_location = doc['publisher_location_tesim']&.first || "Unidentified"
-      normalized_location = raw_location.is_a?(Array) ? raw_location.join(', ').strip : raw_location.to_s.strip
-
-      normalized_location_counts[normalized_location][:count] += 1
-      normalized_location_counts[normalized_location][:ids] << doc['id']
-    end
-
-    location_counts = normalized_location_counts.transform_values { |v| v[:count] }
-    @location_latlong = get_latlong_for_locations(location_counts)
-    unidentified_count = normalized_location_counts.delete("Unidentified")&.dig(:count) || 0
-    @unidentified = { "Unidentified" => { count: unidentified_count } }
-
-    render json: {
-      locations: @location_latlong,
-      unidentified: @unidentified,
-      location_ids: normalized_location_counts
-    }
-  rescue => e
-    Rails.logger.error "Error: #{e.message}, Raised at: #{e.backtrace.first}"
-    render json: { error: e.message }, status: :internal_server_error
-  end
-end
+# def browse_location
+#   begin
+#     search_params = params.to_unsafe_h.deep_symbolize_keys
+#     search_params[:q] = params[:q].present? ? params[:q] : '*:*'
+#     search_params[:page] = 1
+#     search_params[:rows] = 100  # Default per page; will loop to get all
+#     Rails.logger.debug "this: BL search param with date: #{search_params}"
+#     # Optional: extract date range and clean it from query
+#     user_input = nil
+#     date_range_match = search_params[:q].match(/date_created_tesim:\[(-?\d{1,4})TO(-?\d{1,4})\]/)
+#     if date_range_match
+#       start_year, end_year = date_range_match.captures.map(&:to_i)
+#       user_input = "#{start_year},#{end_year}"
+#       search_params[:q].sub!(/AND?\s*\(?date_created_tesim:\[.*?\]\)?/, '')
+#     end
+# 
+#         Rails.logger.debug "this: BL search param without date: #{search_params}"
+# 
+#     all_results = []
+#     current_page = 1
+# 
+#     loop do
+#       search_params[:page] = current_page
+#       response, docs = search_results(search_params)
+#       all_results.concat(docs)
+# 
+#       break if docs.size < search_params[:rows].to_i
+#       current_page += 1
+#     end
+# 
+#     if start_year && end_year && date_range_match
+#       all_results = filter_documents_by_date_range(all_results, user_input)
+#     end
+# 
+#     # Then continue your logic with `all_results`
+#     normalized_location_counts = Hash.new { |hash, key| hash[key] = { count: 0, ids: [] } }
+# 
+#     all_results.each do |doc|
+#       raw_location = doc['publisher_location_tesim']&.first || "Unidentified"
+#       normalized_location = raw_location.is_a?(Array) ? raw_location.join(', ').strip : raw_location.to_s.strip
+# 
+#       normalized_location_counts[normalized_location][:count] += 1
+#       normalized_location_counts[normalized_location][:ids] << doc['id']
+#     end
+# 
+#     location_counts = normalized_location_counts.transform_values { |v| v[:count] }
+#     @location_latlong = get_latlong_for_locations(location_counts)
+#     unidentified_count = normalized_location_counts.delete("Unidentified")&.dig(:count) || 0
+#     @unidentified = { "Unidentified" => { count: unidentified_count } }
+# 
+#     render json: {
+#       locations: @location_latlong,
+#       unidentified: @unidentified,
+#       location_ids: normalized_location_counts
+#     }
+#   rescue => e
+#     Rails.logger.error "Error: #{e.message}, Raised at: #{e.backtrace.first}"
+#     render json: { error: e.message }, status: :internal_server_error
+#   end
+# end
 
  #--------Browse Publisher Location Using Map------#
 
