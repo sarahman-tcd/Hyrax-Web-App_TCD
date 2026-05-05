@@ -73,7 +73,7 @@ Rails.application.routes.draw do
   #end here
 
   
-  get '/catalog/browse_location', to: 'catalog#browse_location', as: 'browse_location'
+#   get '/catalog/browse_location', to: 'catalog#browse_location', as: 'browse_location'
   get '/catalog/combined_search', to: 'catalog#combined_search', as: 'combined_search'
   get '/catalog/filtered_search', to: 'catalog#filtered_search', as: 'filtered_search'
   
