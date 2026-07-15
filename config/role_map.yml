@@ -5,14 +5,14 @@ development:
     - archivist1@example.com
 #    - cataloger@tcd.ie
   admin:
-    - jlakes@tcd.ie
+    - sarahman@tcd.ie
     - batchuser@example.com
     - test@example.com
     - magar@tcd.ie
 
 dcdevhyrax:
   admin:
-    - jlakes@tcd.ie
+    - sarahman@tcd.ie
     - batchuser@example.com
     - magar@tcd.ie
     - smsutton@tcd.ie
@@ -25,7 +25,7 @@ dcdevhyrax:
 
 digcollhyrax01:
   admin:
-    - jlakes@tcd.ie
+    - sarahman@tcd.ie
     - batchuser@example.com
     - magar@tcd.ie
     - smsutton@tcd.ie
@@ -38,7 +38,7 @@ digcollhyrax01:
 
 digcollhyrax02:
   admin:
-    - jlakes@tcd.ie
+    - sarahman@tcd.ie
     - batchuser@example.com
     - magar@tcd.ie
     - smsutton@tcd.ie
@@ -51,7 +51,7 @@ digcollhyrax02:
 
 test:
   admin:
-      - jlakes@tcd.ie
+      - sarahman@tcd.ie
       - test@example.com
       - batchuser@example.com
   archivist:

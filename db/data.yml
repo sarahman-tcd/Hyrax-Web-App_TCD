@@ -452,7 +452,7 @@ permission_template_accesses:
   - - 4
     - 2
     - user
-    - jlakes@tcd.ie
+    - sarahman@tcd.ie
     - manage
     - '2018-12-05 10:18:02.208053'
     - '2018-12-05 10:18:02.208053'
@@ -466,7 +466,7 @@ permission_template_accesses:
   - - 6
     - 3
     - user
-    - jlakes@tcd.ie
+    - sarahman@tcd.ie
     - manage
     - '2018-12-13 17:34:02.506221'
     - '2018-12-13 17:34:02.506221'
@@ -2088,7 +2088,7 @@ users:
   - preferred_locale
   records: 
   - - 1
-    - jlakes@tcd.ie
+    - sarahman@tcd.ie
     - "$2a$11$3jXpM0hmTfAZ57Z/gBSByOk..jTAf1ZHtYXyg8YuC7W6yW1JO4cw2"
     - 
     - 
@@ -2169,48 +2169,48 @@ version_committers:
     - 
     - 
     - http://127.0.0.1:8080/fcrepo-webapp-4.7.5/rest/dev/ht/24/wj/40/ht24wj40p/files/979fc44b-6f07-4bd9-b8ef-2140ec5b7866/fcr:versions/version1
-    - jlakes@tcd.ie
+    - sarahman@tcd.ie
     - '2018-12-05 10:40:55.805546'
     - '2018-12-05 10:40:55.805546'
   - - 2
     - 
     - 
     - http://127.0.0.1:8080/fcrepo-webapp-4.7.5/rest/dev/2b/88/qc/16/2b88qc16g/files/9a22173a-9962-4494-9929-9cc61a6503ee/fcr:versions/version1
-    - jlakes@tcd.ie
+    - sarahman@tcd.ie
     - '2018-12-05 10:48:41.950741'
     - '2018-12-05 10:48:41.950741'
   - - 3
     - 
     - 
     - http://127.0.0.1:8080/fcrepo-webapp-4.7.5/rest/dev/1z/40/ks/80/1z40ks800/files/59d0c423-6d77-4e1c-82b1-d469d3ce5534/fcr:versions/version1
-    - jlakes@tcd.ie
+    - sarahman@tcd.ie
     - '2018-12-05 10:49:56.239679'
     - '2018-12-05 10:49:56.239679'
   - - 4
     - 
     - 
     - http://127.0.0.1:8080/fcrepo-webapp-4.7.5/rest/dev/n5/83/xt/96/n583xt96p/files/25419b8c-05d1-445a-9048-10b4f7ee65dc/fcr:versions/version1
-    - jlakes@tcd.ie
+    - sarahman@tcd.ie
     - '2018-12-05 10:50:53.650523'
     - '2018-12-05 10:50:53.650523'
   - - 5
     - 
     - 
     - http://127.0.0.1:8080/fcrepo-webapp-4.7.5/rest/dev/sx/61/dm/28/sx61dm28w/files/27b515f1-6ec2-4cdf-bb2d-c8102b6573a7/fcr:versions/version1
-    - jlakes@tcd.ie
+    - sarahman@tcd.ie
     - '2018-12-05 16:45:24.276792'
     - '2018-12-05 16:45:24.276792'
   - - 6
     - 
     - 
     - http://127.0.0.1:8080/fcrepo-webapp-4.7.5/rest/dev/pn/89/d6/56/pn89d6567/files/751fed0e-24d0-46d6-995e-0a37ebb709ba/fcr:versions/version1
-    - jlakes@tcd.ie
+    - sarahman@tcd.ie
     - '2018-12-05 17:25:14.573621'
     - '2018-12-05 17:25:14.573621'
   - - 7
     - 
     - 
     - http://127.0.0.1:8080/fcrepo-webapp-4.7.5/rest/dev/q8/11/kj/60/q811kj606/files/9bf3de12-1ac7-4152-a740-d3fe53f5405f/fcr:versions/version1
-    - jlakes@tcd.ie
+    - sarahman@tcd.ie
     - '2018-12-10 12:03:26.930100'
     - '2018-12-10 12:03:26.930100'
