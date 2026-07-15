@@ -214,7 +214,7 @@ end
           contributor_tesim
           copyright_note_tesim
           creator_tesim
-          digital_object_identifier_tesim
+          doi_tesim
           keyword_tesim
           publisher_tesim
           identifier_tesim
@@ -844,7 +844,7 @@ def map_field_to_solr(field)
    "contributor_tesim" => "contributor_tesim",
    "copyright_note_tesim" => "copyright_note_tesim",
    "creator_tesim" => "creator_tesim",
-   "digital_object_identifier_tesim" => "digital_object_identifier_tesim",
+   "doi_tesim" => "doi_tesim",
    "keyword_tesim" => "keyword_tesim",
    "publisher_tesim" => "publisher_tesim",
    "identifier_tesim" => "identifier_tesim",

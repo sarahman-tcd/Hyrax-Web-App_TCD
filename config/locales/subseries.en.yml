@@ -12,6 +12,7 @@ en:
           genre_tesim: Format
           abstract_tesim: Abstract
           digital_object_identifier_tesim: Digital Object Id
+          doi_tesim: DOI
           dris_unique_tesim: Dris Unique
           sponsor_tesim: Sponsor
           bibliography_tesim: Bibliography
@@ -51,6 +52,7 @@ en:
           issued_with_label: With
           abstract_tesim: Abstract
           digital_object_identifier_tesim: Digital Object Id
+          doi_tesim: DOI
           dris_unique_tesim: Dris Unique
           sponsor_tesim: Sponsor
           bibliography_tesim: Bibliography

@@ -46,7 +46,7 @@ class CustomSearchBuilder < Hyrax::CatalogSearchBuilder
         "contributor" => "contributor_tesim",
         "copyright_note" => "copyright_note_tesim",
         "creator" => "creator_tesim",
-        "doi" => "digital_object_identifier_tesim",
+        "doi" => "doi_tesim",
         "keyword" => "keyword_tesim",
         "publisher" => "publisher_tesim",
         "reference_no" => "identifier_tesim",
