@@ -35,7 +35,18 @@
             <div class="ajax-meta-row">
               <span class="ajax-label"><%= label %>:</span>
               <span class="ajax-value truncate-1-line" title="<%= document[field].join(', ') %>">
-                <%= document[field].join(', ') %>
+                <% if field == 'doi_tesim' %>
+                  <% links = document[field].map do |val| %>
+                    <% if val.to_s.strip =~ /\Ahttps?:\/\//i %>
+                      <%= link_to val, val, target: "_blank", rel: "noopener" %>
+                    <% else %>
+                      <%= val %>
+                    <% end %>
+                  <% end %>
+                  <%= safe_join(links, ', ') %>
+                <% else %>
+                  <%= document[field].join(', ') %>
+                <% end %>
               </span>
             </div>
           <% end %>
@@ -49,7 +60,7 @@
         <% render_row.call('Publisher', 'publisher_tesim') %>
         <% render_row.call('Shelf Mark', 'identifier_tesim') %>
         <% render_row.call('Copyright', 'copyright_note_tesim') %>
-        <% render_row.call('DOI', 'digital_object_identifier_tesim') %>
+        <% render_row.call('DOI', 'doi_tesim') %>
         <% render_row.call('Date', 'date_created_tesim') %>
         <% render_row.call('Type', 'resource_type_tesim') %>
       </div>

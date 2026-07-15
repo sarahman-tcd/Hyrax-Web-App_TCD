@@ -231,7 +231,7 @@
           // and extract the value.
           // Example: (abstract_tesim:*Michael* OR ... OR digital_object_identifier_tesim:*Michael*)
           // We use a non-greedy match for the content in between
-          let processedParams = searchParams.replace(/\(abstract_tesim:(.*?) OR .*?digital_object_identifier_tesim:.*?\)/g, (match, val) => {
+          let processedParams = searchParams.replace(/\(abstract_tesim:(.*?) OR .*?doi_tesim:.*?\)/g, (match, val) => {
              // Extract the value from the first field match
              // val is captured from abstract_tesim:VAL
              return `Any_Field:${val}`;
