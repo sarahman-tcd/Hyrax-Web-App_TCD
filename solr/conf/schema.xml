@@ -320,6 +320,7 @@
           <filter class="solr.StandardFilterFactory"/>
           <filter class="solr.LowerCaseFilterFactory"/>
           <filter class="solr.RemoveDuplicatesTokenFilterFactory"/>
+          <filter class="solr.LengthFilterFactory" min="1" max="500" />
        </analyzer>
     </fieldType>
 
@@ -596,9 +597,9 @@
    <copyField source="subject_t" dest="opensearch_display"/>
    <copyField source="subject_addl_t" dest="opensearch_display"/>
 
-   <!-- for suggestions -->
-   <copyField source="*_t" dest="suggest"/>
-   <copyField source="*_facet" dest="suggest"/>
+   <!-- for suggestions - maxChars prevents immense term errors from long text fields like abstract -->
+   <copyField source="*_t" dest="suggest" maxChars="500"/>
+   <copyField source="*_facet" dest="suggest" maxChars="500"/>
 
    <!-- Above, multiple source fields are copied to the [text] field.
 	  Another way to map multiple source fields to the same

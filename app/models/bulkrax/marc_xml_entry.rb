@@ -325,6 +325,11 @@ module Bulkrax
       end
     end
 
+    # Solr's suggest field copies all *_tesim fields via copyField. The KeywordTokenizer
+    # then treats each full field value as a single token, and Lucene hard-limits tokens
+    # to 32,766 bytes. Any abstract exceeding ~30k chars will cause a 400 Bad Request.
+    SOLR_MAX_TERM_CHARS = 30_000
+
     def add_abstracts
       full_abstract = ""
       record.abstracts.each do | abs |
@@ -332,7 +337,8 @@ module Bulkrax
         code_u = abs.xpath("subfield[@code='u']").text.strip
         full_abstract = full_abstract + code_a + " " + code_u + " "
       end
-      self.parsed_metadata['abstract'] = [full_abstract.strip]
+      full_abstract = full_abstract.strip
+      self.parsed_metadata['abstract'] = [full_abstract]
       desc = full_abstract
       if desc.length > 200
         desc = (desc.slice(0..200) + '...')
