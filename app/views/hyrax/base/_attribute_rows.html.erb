@@ -176,7 +176,14 @@
 <%= presenter.attribute_to_html(:physical_extent, html_dl: true) %>
 <%= presenter.attribute_to_html(:issued_with, html_dl: true) %>
 <%= presenter.attribute_to_html(:language, render_as: :faceted, html_dl: true) %>
-<%= presenter.attribute_to_html(:abstract, html_dl: true) %>
+<% if presenter.abstract.present? %>
+  <dt><%= t('hyrax.base.show.abstract', default: 'Abstract') %></dt>
+  <% Array(presenter.abstract).each do |abstract_val| %>
+    <dd itemprop="abstract">
+      <%= abstract_val %><% if presenter.solr_document['abstract_truncated_bsi'] == true %>... <a href="<%= main_app.abstract_pdf_path(id: presenter.id) %>" target="_blank" data-turbolinks="false" title="The abstract for this record was too long to display in full. Click to download the complete text as a PDF." style="text-decoration: underline; white-space: nowrap; font-weight: 500; color: #2c5282;">Download full abstract (PDF)</a><% end %>
+    </dd>
+  <% end %>
+<% end %>
 <%= presenter.attribute_to_html(:note, html_dl: true) %>
 <%= presenter.attribute_to_html(:biographical_note, html_dl: true) %>
 <%= presenter.attribute_to_html(:related_url, render_as: :external_link, html_dl: true) %>
