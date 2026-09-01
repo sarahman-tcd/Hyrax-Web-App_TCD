@@ -57,6 +57,8 @@ Rails.application.routes.draw do
 
   get 'pdf_generation/check_pdf_file_exists/:file_set_id', to: 'pdf_generation#check_pdf_file_exists', constraints: AboutParamsConstraint.new
   get 'pdf_generation/pdf_text_file_exists/:file_set_id', to: 'pdf_generation#pdf_text_file_exists', constraints: AboutParamsConstraint.new
+  # Abstract PDF download (full text from Fedora)
+  get '/abstract_pdf/:id', to: 'abstract_pdf#download', as: 'abstract_pdf', constraints: AboutParamsConstraint.new
   # End
 
   # #For Live
@@ -73,7 +75,7 @@ Rails.application.routes.draw do
   #end here
 
   
-#   get '/catalog/browse_location', to: 'catalog#browse_location', as: 'browse_location'
+  get '/catalog/browse_location', to: 'catalog#browse_location', as: 'browse_location'
   get '/catalog/combined_search', to: 'catalog#combined_search', as: 'combined_search'
   get '/catalog/filtered_search', to: 'catalog#filtered_search', as: 'filtered_search'
   

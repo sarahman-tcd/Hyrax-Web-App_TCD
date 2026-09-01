@@ -171,6 +171,7 @@
         <filter class="solr.StandardFilterFactory"/>
         <filter class="solr.LowerCaseFilterFactory"/>
         <filter class="solr.RemoveDuplicatesTokenFilterFactory"/>
+        <filter class="solr.LengthFilterFactory" min="1" max="500" />
       </analyzer>
     </fieldType>
   </types>
@@ -345,9 +346,9 @@
     copyField also supports a maxChars to copy setting.  -->
 
    <!-- <copyField source="*_tesim" dest="all_text_timv" maxChars="3000"/> -->
-   <!-- for suggestions -->
-   <copyField source="*_tesim" dest="suggest"/>
-   <copyField source="*_ssim" dest="suggest"/>
+   <!-- for suggestions - maxChars prevents immense term errors from long text fields like abstract -->
+   <copyField source="*_tesim" dest="suggest" maxChars="500"/>
+   <copyField source="*_ssim" dest="suggest" maxChars="500"/>
 
  <!-- Similarity is the scoring routine for each document vs. a query.
       A custom similarity may be specified here, but the default is fine
