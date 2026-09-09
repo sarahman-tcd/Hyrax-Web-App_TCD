@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20260205161457) do
+ActiveRecord::Schema.define(version: 20260909100000) do
 
   create_table "bookmarks", id: :integer, force: :cascade, options: "ENGINE=InnoDB DEFAULT CHARSET=latin1" do |t|
     t.integer "user_id", null: false
@@ -30,11 +30,11 @@ ActiveRecord::Schema.define(version: 20260205161457) do
     t.string "collection_ids"
     t.string "type"
     t.bigint "importerexporter_id"
-    t.text "raw_metadata"
-    t.text "parsed_metadata"
+    t.text "raw_metadata", limit: 4294967295
+    t.text "parsed_metadata", limit: 4294967295
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.text "last_error"
+    t.text "last_error", limit: 4294967295
     t.datetime "last_error_at"
     t.datetime "last_succeeded_at"
     t.index ["importerexporter_id"], name: "index_bulkrax_entries_on_importerexporter_id"
@@ -94,7 +94,7 @@ ActiveRecord::Schema.define(version: 20260205161457) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.boolean "validate_only"
-    t.text "last_error"
+    t.text "last_error", limit: 4294967295
     t.datetime "last_error_at"
     t.datetime "last_succeeded_at"
     t.index ["user_id"], name: "index_bulkrax_importers_on_user_id"
