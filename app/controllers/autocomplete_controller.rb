@@ -1,21 +1,30 @@
+require_dependency 'solr_sanitizer'
+
 class AutocompleteController < ApplicationController
   # AJAX endpoint to fetch matching titles for autocomplete
   def titles
     begin
       query = params[:term].to_s.strip  # jQuery UI sends 'term' parameter
-      
+
       # Return empty array if query is too short
       if query.length < 2
         render json: []
         return
       end
-      
+
+      # Sanitize user input to prevent Solr Local Parameter injection.
+      # SolrSanitizer.escape applies RSolr.solr_escape AND strips {, }, !
+      # so strings like {!lucene} cannot break out of the intended eDisMax parser.
+      safe_query = SolrSanitizer.escape(query)
+
       # Query Solr for titles matching the search term
       solr = Blacklight.default_index.connection
-      
-      # Efficient query: only fetch titles that match the user's input
+
+      # Efficient query: only fetch titles that match the user's input.
+      # defType is enforced here so injection cannot override the query parser.
       solr_params = {
-        q: "*:* AND -human_readable_type_sim:Collection AND title_tesim:*#{query}*",
+        defType: 'edismax',
+        q: "*:* AND -human_readable_type_sim:Collection AND title_tesim:*#{safe_query}*",
         fl: 'title_tesim',
         rows: 15  # Only fetch 15 matching results
       }

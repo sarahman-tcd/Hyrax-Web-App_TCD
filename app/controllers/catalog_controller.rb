@@ -1,7 +1,8 @@
 require 'rest-client'
 require 'net/http'
- require 'json'
- require 'uri'
+require 'json'
+require 'uri'
+require_dependency 'solr_sanitizer'
 
 
 class CatalogController < ApplicationController
@@ -165,6 +166,8 @@ class CatalogController < ApplicationController
       # Else, look for partial any:(something) within a query and expand it
       elsif original_q =~ /any:\(?([^)]+?)\)?/i
         user_query = Regexp.last_match(1).strip
+        # Sanitize user input to prevent Solr Local Parameter injection
+        safe_user_query = SolrSanitizer.escape(user_query)
         fields = %w[
           abstract_tesim
           contributor_tesim
@@ -177,7 +180,7 @@ class CatalogController < ApplicationController
           subject_tesim
           title_tesim
         ]
-        expanded = "(#{fields.map { |f| "#{f}:(#{user_query})" }.join(' OR ')})"
+        expanded = "(#{fields.map { |f| "#{f}:(#{safe_user_query})" }.join(' OR ')})"
         search_params[:q] = original_q.sub(/any:\(?([^)]+?)\)?/i, expanded)
 
       else
@@ -212,7 +215,8 @@ class CatalogController < ApplicationController
 
     if params[:location_filter].present?
       location_ids = params[:location_filter].split(',')
-      location_filter_query = "id:(" + location_ids.map { |id| "\"#{id.strip}\"" }.join(" OR ") + ")"
+      # Escape each ID to prevent Local Parameter injection via the location filter
+      location_filter_query = "id:(" + location_ids.map { |id| "\"#{SolrSanitizer.escape(id.strip)}\"" }.join(" OR ") + ")"
       
       # Combine this into the existing query
       search_params[:q] = "#{search_params[:q]} AND #{location_filter_query}"
@@ -812,11 +816,14 @@ def map_field_to_solr(field)
 end
 
 def map_operator_to_solr(operator, query, field, is_any_field = false)
-   # Escape special Solr characters except wildcards for certain operators
+   # Escape special Solr characters except wildcards for certain operators.
+   # Both branches also strip raw { } ! after escaping as defence-in-depth
+   # against Solr Local Parameter injection.
    def escape_solr_query(str, allow_wildcards = false)
      if allow_wildcards
-       # Escape everything except * and ?
+       # Escape everything except * and ?, then strip any remaining local-param chars
        str.gsub(/([+\-&|!(){}\[\]^"~:\\\/])/) { |match| "\\#{match}" }
+          .gsub(/[\{\}!]/, '')
      else
        # Escape all special characters including wildcards
        str.gsub(/([+\-&|!(){}\[\]^"~*?:\\\/])/) { |match| "\\#{match}" }
@@ -917,7 +924,9 @@ end
    config.default_solr_params = {
      qt: "search",
      rows: 10,
-     qf: "title_tesim description_tesim creator_tesim keyword_tesim culture_tesim abstract_tesim"
+     qf: "title_tesim description_tesim creator_tesim keyword_tesim culture_tesim abstract_tesim",
+     # Explicitly enforce eDisMax so injected local params cannot override the query parser
+     defType: 'edismax'
    }
 
 
