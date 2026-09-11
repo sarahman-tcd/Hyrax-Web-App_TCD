@@ -23,7 +23,8 @@ class DoiController < ApplicationController
         redirect_back(fallback_location: root_path)
       end
     rescue StandardError => e
-      flash[:error] = "ERROR: " + params[:objid] + " => " + "ImageDisplayNamesController => " + e.to_s
+      Rails.logger.error "DoiController#createDoi error (#{e.class}) for objid #{params[:id]}: #{e.message}\n#{e.backtrace&.join("\n")}"
+      flash[:error] = "An unexpected error occurred while attempting to create the DOI."
       redirect_back(fallback_location: root_path)
     end
 
