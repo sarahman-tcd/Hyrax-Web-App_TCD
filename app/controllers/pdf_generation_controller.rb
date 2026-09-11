@@ -52,7 +52,7 @@ class PdfGenerationController < ApplicationController
         secondary = 'http://digcoll-solr02.tcd.ie:8983/solr/tcd-hyrax/'
 
         # This- Replace dev to primary 
-        $solr = RSolr.connect(url: dev) 
+        $solr = RSolr.connect(url: primary) 
         work_response = $solr.get('select', params: { q: "id:#{work_id}" })
         work_data = work_response['response']['docs'][0]        
     
@@ -198,8 +198,8 @@ class PdfGenerationController < ApplicationController
         end
       
       rescue => e
-        backtrace = e.backtrace.first
-        Rails.logger.error "Error: #{e.message}, Raised at: #{backtrace}"
+        Rails.logger.error "PdfGenerationController#pdf error (#{e.class}): #{e.message}\n#{e.backtrace&.join("\n")}"
+        render json: { error: 'An unexpected error occurred while generating the PDF.' }, status: :internal_server_error
       end
     end   
     
@@ -285,8 +285,8 @@ class PdfGenerationController < ApplicationController
           send_file pdf_path, filename: pdf_filename, type: 'application/pdf', disposition: 'inline'
         end  
       rescue => e
-        backtrace = e.backtrace.first
-        Rails.logger.error "Error: #{e.message}, Raised at: #{backtrace}"
+        Rails.logger.error "PdfGenerationController#generate_and_download_pdf error (#{e.class}): #{e.message}\n#{e.backtrace&.join("\n")}"
+        render json: { error: 'An unexpected error occurred while building the PDF.' }, status: :internal_server_error
       end
     end    
 
