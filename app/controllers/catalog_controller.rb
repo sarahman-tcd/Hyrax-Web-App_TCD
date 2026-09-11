@@ -75,10 +75,10 @@ class CatalogController < ApplicationController
    write_data(existing_data)
    
    render json: { message: 'Saved successfully' }
- rescue => e
-   # If any error occurs during the process, respond with an error message
-   Rails.logger.error "Error: #{e.message}, Raised at: #{backtrace}"
-   render json: { error: e.message }, status: :unprocessable_entity
+   rescue => e
+   # If any error occurs during the process, log it internally and respond with a generic message
+   Rails.logger.error "Title order save error (#{e.class}): #{e.message}\n#{e.backtrace&.join("\n")}"
+   render json: { error: 'An unexpected error occurred while saving tile order.' }, status: :unprocessable_entity
  end
  #--------Tile Order------#
 
@@ -298,8 +298,8 @@ class CatalogController < ApplicationController
       format.js { render partial: 'catalog/search_results', formats: [:js] }  # Ensure JavaScript format is handled
     end
   rescue => e
-    Rails.logger.error "Error: #{e.message}, Raised at: #{e.backtrace.first}"
-    render json: { error: 'An error occurred during the search.', details: e.message }, status: :internal_server_error
+    Rails.logger.error "CatalogController#index error (#{e.class}): #{e.message}\n#{e.backtrace&.join("\n")}"
+    render json: { error: 'An error occurred during the search.' }, status: :internal_server_error
   end
 end
 
@@ -362,9 +362,8 @@ end
         }
       }
     rescue => e
-      Rails.logger.error "Error in filtered_search: #{e.message}"
-      Rails.logger.error e.backtrace.join("\n")
-      render json: { error: e.message }, status: :internal_server_error
+      Rails.logger.error "CatalogController#filtered_search error (#{e.class}): #{e.message}\n#{e.backtrace&.join("\n")}"
+      render json: { error: 'An unexpected error occurred while filtering results.' }, status: :internal_server_error
     end
   end
 

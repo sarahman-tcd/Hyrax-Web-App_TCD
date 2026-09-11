@@ -41,7 +41,8 @@ class ImageDisplayNamesController < ApplicationController
           #=> clean up the data so that I don't get code injections
       end
     rescue StandardError => e
-      message = "ERROR: " + params[:objid] + " => " + "ImageDisplayNamesController => " + e.to_s
+      Rails.logger.error "ImageDisplayNamesController#create error (#{e.class}) for objid #{params[:objid]}: #{e.message}\n#{e.backtrace&.join("\n")}"
+      message = "An error occurred while attempting to record image labels."
     end
 
     # new that the data is stored, I need to kick of a job that processes the work and its filesets.

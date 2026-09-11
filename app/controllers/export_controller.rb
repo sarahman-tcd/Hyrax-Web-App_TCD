@@ -15,7 +15,8 @@ class ExportController < ApplicationController
        format.html
        format.xml { render xml: builder  }
       end
-    rescue
+    rescue => e
+      Rails.logger.error "ExportController#dublinCore error (#{e.class}) for objid #{params[:id]}: #{e.message}\n#{e.backtrace&.join("\n")}"
     end
 
   end
