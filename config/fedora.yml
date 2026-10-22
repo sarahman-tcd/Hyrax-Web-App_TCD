@@ -1,13 +1,13 @@
 
 development:
-  user: fedoraAdmin
-  password: fedoraAdmin
+  user: <%= ENV['FEDORA_ADMIN_USER'] || 'fedoraAdmin' %>
+  password: <%= ENV['FEDORA_ADMIN_PASSWORD'] %>
   url: http://127.0.0.1:8984/rest
   base_path: /dev
 
 dcdevhyrax:
-  user: fedoraAdmin
-  password: fedoraAdmin
+  user: <%= ENV['FEDORA_ADMIN_USER'] || 'fedoraAdmin' %>
+  password: <%= ENV['FEDORA_ADMIN_PASSWORD'] %>
   url: http://127.0.0.1:8984/rest
   base_path: /dev
 
