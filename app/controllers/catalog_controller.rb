@@ -614,7 +614,7 @@ end
 # end
  
 def get_latlong_for_locations_old(locations_with_count)
-  api_key = 'AIzaSyB7n9JSvr5tZX8lZMzTDMNWk9e11MgLYek'
+  api_key = ENV.fetch('GOOGLE_MAPS_API_KEY') { raise 'GOOGLE_MAPS_API_KEY environment variable is not set' }
   location_latlong = {}
 
   locations_with_count.each do |location, count|
@@ -653,7 +653,7 @@ def get_latlong_for_locations_old(locations_with_count)
 end  
 
 def get_latlong_for_locations(locations_with_count)
-api_key = 'AIzaSyB7n9JSvr5tZX8lZMzTDMNWk9e11MgLYek'
+api_key = ENV.fetch('GOOGLE_MAPS_API_KEY') { raise 'GOOGLE_MAPS_API_KEY environment variable is not set' }
 cache_file = Rails.root.join('public', 'cached_locations.json')
 
 # Ensure the cache file exists

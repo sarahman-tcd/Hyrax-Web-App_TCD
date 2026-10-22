@@ -13,8 +13,9 @@
 
 # Ignore database.yml. Store on servers in shared/congig instead
 /config/database.yml
-# Ignore secrets.yml. Store on servers in shared/congig instead
+# Ignore secrets.yml. Store on servers in shared/config instead
 /config/secrets.yml
+/config/.travis.secrets.yml
 
 # Ignore all logfiles and tempfiles.
 /log/*

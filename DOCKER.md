@@ -30,7 +30,7 @@ Or (in background)
 > docker-compose exec web db:create db:migrate db:seed
 ```
 
-Note: db:seed setups up the admin sets and collection types and creates an admin user admin@example.org / admin
+Note: db:seed sets up the admin sets and collection types and creates an admin user. Set `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` environment variables before running to configure the admin account credentials.
 
 ## with VIRTUAL_HOST
 
