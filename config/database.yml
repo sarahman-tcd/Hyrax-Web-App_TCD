@@ -13,10 +13,15 @@ default: &default
   database: <%= ENV['MYSQL_DATABASE'] || 'dev_hyrax' %>
   pool: 5
 
+# development:
+#   <<: *default
+#   username: <%= ENV['HYRAX_DATABASE_USER'] || 'hyraxuser' %>
+#   password: <%= ENV['HYRAX_DATABASE_PASSWORD'] || '#Pa$$w0rd' %>
+
 development:
   <<: *default
   username: <%= ENV['HYRAX_DATABASE_USER'] || 'hyraxuser' %>
-  password: <%= ENV['HYRAX_DATABASE_PASSWORD'] || '#Pa$$w0rd' %>
+  password: <%= ENV['HYRAX_DATABASE_PASSWORD'] %>
 
 demovm045:
   <<: *default
@@ -28,7 +33,7 @@ demovm099:
   <<: *default
   database: hyrax
   username: <%= ENV['MYSQL_USER'] || 'root' %>
-  password: Pa$$w0rd
+  password: <%= ENV['DCDEV_HYRAX_DATABASE_PASSWORD'] %>
 
 dcdevhyrax:
   <<: *default
@@ -42,8 +47,8 @@ dcdevhyrax:
 test:
   <<: *default
   database: <%= ENV['HYRAX_TEST_DATABASE_NAME'] || 'test_hyrax' %>
-  username: <%= ENV['MYSQL_USER'] || 'travis' %>
-  password: <%= ENV['MYSQL_PASSWORD'] || 'Pa$$w0rd' %>
+  username: <%= ENV['HYRAX_DATABASE_USER'] || 'hyraxuser' %>
+  password: <%= ENV['HYRAX_DATABASE_PASSWORD'] %>
 
 production:
   <<: *default

@@ -11,7 +11,9 @@ if Rails.env == 'development'
   Rake::Task['hyrax:default_collection_types:create'].invoke
   Rake::Task['hyrax:workflow:load'].invoke
 
-  user = User.first_or_create!(email: 'admin@example.com', password: 'testing123')
+  seed_admin_email    = ENV.fetch('SEED_ADMIN_EMAIL',    'admin@example.com')
+  seed_admin_password = ENV.fetch('SEED_ADMIN_PASSWORD') { raise 'Set SEED_ADMIN_PASSWORD before running db:seed' }
+  user = User.first_or_create!(email: seed_admin_email, password: seed_admin_password)
   admin = Role.first_or_create!(name: 'admin')
   admin.users << user
   admin.save

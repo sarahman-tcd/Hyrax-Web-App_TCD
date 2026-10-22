@@ -18,7 +18,7 @@ require 'net/http/post/multipart'
 class PdfGenerationController < ApplicationController    
     Encoding.default_external = Encoding::UTF_8
     OCR_SPACE_API_URL = 'https://apipro2.ocr.space/parse/image'.freeze
-    API_KEY='DPD8EXN57323X'.freeze
+    API_KEY = ENV.fetch('OCR_SPACE_API_KEY') { raise 'OCR_SPACE_API_KEY environment variable is not set' }.freeze
     
     def pdf   
       begin   

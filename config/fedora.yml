@@ -1,15 +1,14 @@
 
 development:
   user: <%= ENV['FEDORA_ADMIN_USER'] || 'fedoraAdmin' %>
-  password: <%= ENV['FEDORA_ADMIN_PASSWORD'] || 'fedoraAdmin' %>
-    #fedoraAdmin
-  url: <%= ENV['FEDORA_URL'] || 'http://127.0.0.1:8080/fcrepo-webapp-4.7.5/rest' %>
+  password: <%= ENV['FEDORA_ADMIN_PASSWORD'] %>
+  url: http://127.0.0.1:8984/rest
   base_path: /dev
 
 dcdevhyrax:
-  user: <%= ENV['FEDORA_ADMIN_USER'] %>
+  user: <%= ENV['FEDORA_ADMIN_USER'] || 'fedoraAdmin' %>
   password: <%= ENV['FEDORA_ADMIN_PASSWORD'] %>
-  url: http://dcdev-fedora.tcd.ie:8080/fcrepo-webapp-4.7.5/rest
+  url: http://127.0.0.1:8984/rest
   base_path: /dev
 
 digcollhyrax01:
